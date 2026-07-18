@@ -75,7 +75,38 @@ ok("能逐条看思路", $(".hint"));
 $("#ans").value = "55";
 click($("#ok"));
 ok("答对显示解题大招", !$("#big").classList.contains("hidden"));
-ok("挑战奖励金币入账", window.eval("S.challengeDone.gauss === true"));
+ok("挑战奖励金币入账", window.eval("S.challengeDone.eg_gauss === true"));
+
+console.log("— 数据完整性：遍历全部站点题目 —");
+const report = window.eval(`(function(){
+  const errs=[];
+  for(const [id,st] of Object.entries(STATIONS)){
+    if(!st.labels||!st.core||!st.extend||!st.challenge) errs.push(id+" 结构缺字段");
+    st.core.forEach(sk=>{ for(let k=0;k<20;k++){ const p=sk.gen(); if(typeof p.a!=="number"||!isFinite(p.a)) errs.push(id+"/"+sk.id+" 答案非数字"); if(!p.q) errs.push(id+"/"+sk.id+" 缺题面"); } });
+    (st.extend.tricks||[]).concat([]).forEach(t=>{ for(let k=0;k<10;k++){ const p=t.gen(); if(typeof p.a!=="number") errs.push(id+" trick "+t.name+" 答案非数字"); } });
+    (st.extend.play||[]).forEach(fn=>{ for(let k=0;k<10;k++){ const p=fn(); if(typeof p.a!=="number") errs.push(id+" play 答案非数字"); } });
+    st.challenge.forEach(c=>{
+      if(!c.steps||!c.steps.length) errs.push(id+"/"+c.id+" 缺思路steps");
+      if(!c.big) errs.push(id+"/"+c.id+" 缺解题大招");
+      if(c.type==="choice"){ if(!(c.a>=0&&c.a<c.options.length)) errs.push(id+"/"+c.id+" 选项答案越界"); }
+      else { if(typeof c.a!=="number") errs.push(id+"/"+c.id+" 填空答案非数字"); }
+    });
+  }
+  return errs;
+})()`);
+ok("三站题目数据全部合法（含答案类型/思路/大招）", report.length === 0);
+if (report.length) report.forEach(e => console.log("    · " + e));
+
+console.log("— 古希腊/中华站可正常进入 —");
+window.eval("S.unlocked.greece=true; S.unlocked.china=true;");
+for (const civ of ["greece", "china"]) {
+  window.eval(`sess=null; nav=[]; S.view='station'; S.civ='${civ}'; render();`);
+  ok(civ + " 站渲染出三层深度", window.document.querySelectorAll(".depth").length === 3);
+  window.eval(`sess=null; S.view='core'; render();`);
+  let g = 0;
+  while ($("#ans") && g++ < 12) { $("#ans").value = String(window.eval("sess.cur.prob.a")); click($("#ok")); ok(civ + " 课内答对判定", $("#fb").classList.contains("ok")); if ($("#nextb") && !$("#nextb").classList.contains("hidden")) click($("#nextb")); }
+  ok(civ + " 课内一轮跑完", $("#screen").innerHTML.includes("这一轮做对"));
+}
 
 console.log("— 三科共享钱包互通 —");
 window.localStorage.setItem("sharedWallet_v1", JSON.stringify({ coins: 999, tickets: 7 }));

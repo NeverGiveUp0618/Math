@@ -68,7 +68,9 @@ function markCorrect() {
 }
 
 /* ---------- SRS ---------- */
-function srsDueList() { const t = todayStr(); return STATIONS.core.filter(s => { const r = S.srs[s.id]; return r && r.due <= t; }); }
+const ST = civ => STATIONS[civ || S.civ];   // 当前文明站内容
+function srsDueList(civ) { const t = todayStr(); const st = ST(civ); if (!st) return []; return st.core.filter(s => { const r = S.srs[s.id]; return r && r.due <= t; }); }
+function srsDueAll() { const t = todayStr(); return Object.values(STATIONS).flatMap(s => s.core).filter(s => { const r = S.srs[s.id]; return r && r.due <= t; }); }
 function srsGrade(id, ok) {
   const t = todayStr();
   let r = S.srs[id] || { lv: 0, due: t };
@@ -154,21 +156,21 @@ function renderMap(scr) {
 function renderStation(scr) {
   const c = CIVS.find(x => x.id === S.civ);
   $("#title").textContent = c.name;
-  if (S.civ !== "egypt") {  // v1 只做了古埃及
-    scr.className = "depths";
-    scr.innerHTML = `<div class="guide"><div class="ow">🦉</div><div class="bubble">这座 <b>${c.name}</b> 文明的关卡欧几还在铺路，很快就能来探险！先回古埃及把三颗星集齐吧。</div></div>`;
+  const station = ST();
+  scr.className = "depths";
+  if (!station) {  // 该文明内容还没铺好
+    scr.innerHTML = `<div class="guide"><div class="ow">🦉</div><div class="bubble">这座 <b>${c.name}</b> 文明的关卡欧几还在铺路，很快就能来探险！先把前面几站的星星集齐吧。</div></div>`;
     return;
   }
-  const st = stStars(S.civ);
-  scr.className = "depths";
+  const st = stStars(S.civ), L = station.labels;
   scr.innerHTML = `
     <div class="guide"><div class="ow">🦉</div><div class="bubble">${esc(c.blurb)}</div></div>
     <div class="depth" style="--c:#3ec98a" data-d="core"><div class="ico">🌱</div>
-      <div><div class="nm">课内夯实</div><div class="ds">${c.book}《${esc(c.unit)}》· 把课本练到又快又准</div></div>${st.core ? '<span class="done">✓</span>' : ''}</div>
+      <div><div class="nm">课内夯实</div><div class="ds">${esc(L.core)}</div></div>${st.core ? '<span class="done">✓</span>' : ''}</div>
     <div class="depth" style="--c:#e0a13c" data-d="extend"><div class="ico">🚀</div>
-      <div><div class="nm">课外拓展</div><div class="ds">古埃及数字 · 速算魔法 —— 课本上学不到的</div></div>${st.extend ? '<span class="done">✓</span>' : ''}</div>
+      <div><div class="nm">课外拓展</div><div class="ds">${esc(L.extend)}</div></div>${st.extend ? '<span class="done">✓</span>' : ''}</div>
     <div class="depth" style="--c:#9b7bd6" data-d="challenge"><div class="ico">🧠</div>
-      <div><div class="nm">思维挑战</div><div class="ds">奥数思维 · 重「怎么想到的」，一题多解</div></div>${st.challenge ? '<span class="done">✓</span>' : ''}</div>`;
+      <div><div class="nm">思维挑战</div><div class="ds">${esc(L.challenge)}</div></div>${st.challenge ? '<span class="done">✓</span>' : ''}</div>`;
   scr.querySelectorAll(".depth").forEach(el => el.onclick = () => {
     const d = el.dataset.d;
     if (d === "core") go("core"); else if (d === "extend") go("extend"); else go("challenge");
@@ -180,18 +182,17 @@ let sess = null;
 function renderCore(scr) {
   $("#title").textContent = "课内夯实";
   if (!sess || sess.mode !== "core") {
-    const due = srsDueList();
-    sess = { mode: "core", i: 0, n: 8, right: 0, cur: null, revealed: false, dueFirst: due };
+    sess = { mode: "core", civ: S.civ, i: 0, n: 8, right: 0, cur: null, revealed: false };
   }
   nextCore(scr);
 }
 function nextCore(scr) {
   if (sess.i >= sess.n) return coreDone(scr);
-  // 优先出到期复习题，否则随机
+  // 优先出本站到期复习题，否则本站随机
   let skill;
-  const due = srsDueList();
+  const due = srsDueList(sess.civ), pool = ST(sess.civ).core;
   if (due.length) skill = due[Math.floor(Math.random() * due.length)];
-  else skill = STATIONS.core[Math.floor(Math.random() * STATIONS.core.length)];
+  else skill = pool[Math.floor(Math.random() * pool.length)];
   const prob = skill.gen();
   sess.cur = { skill, prob, isDue: !!(S.srs[skill.id] && S.srs[skill.id].due <= todayStr()) };
   sess.revealed = false;
@@ -232,7 +233,7 @@ function nextCore(scr) {
 }
 function coreDone(scr) {
   const passed = sess.right >= 6;
-  if (passed) setStar("egypt", "core");
+  if (passed) setStar(sess.civ, "core");
   scr.className = "stage";
   scr.innerHTML = `<div class="qcard" style="text-align:center">
     <div style="font-size:52px">${passed ? "🏆" : "💪"}</div>
@@ -246,41 +247,40 @@ function coreDone(scr) {
 }
 
 /* ---------- 🚀 课外拓展 ---------- */
+function extendPool(civ) { const e = ST(civ).extend; return (e.tricks || []).map(t => t.gen).concat(e.play || []); }
 function renderExtend(scr) {
   $("#title").textContent = "课外拓展";
   scr.className = "stage";
-  const cards = STATIONS.extend.cards.map((c, i) => `<div class="readcard"><div class="h">${c.icon} ${esc(c.title)}</div><div class="b">${c.body}</div></div>`).join("");
-  const tricks = STATIONS.extend.tricks.map(t => `<div class="readcard"><div class="h">${t.icon} 速算魔法：${esc(t.name)}</div><div class="b">${t.card}</div></div>`).join("");
+  const e = ST().extend;
+  const cards = e.cards.map(c => `<div class="readcard"><div class="h">${c.icon} ${esc(c.title)}</div><div class="b">${c.body}</div></div>`).join("");
+  const tricks = (e.tricks || []).map(t => `<div class="readcard"><div class="h">${t.icon} 速算魔法：${esc(t.name)}</div><div class="b">${t.card}</div></div>`).join("");
   scr.innerHTML = `<div class="guide"><div class="ow">🦉</div><div class="bubble">这些是课本里<b>没有</b>的东西——读一读，再玩玩练习，就能领到拓展星。</div></div>
     ${cards}${tricks}
-    <button class="btn wide" id="play">🎮 玩：象形数字 + 速算练习</button>`;
-  STATIONS.extend.cards.forEach((c, i) => { S.readCards["egypt_c" + i] = true; }); save();
+    <button class="btn wide" id="play">🎮 玩一玩拓展练习</button>`;
+  e.cards.forEach((c, i) => { S.readCards[S.civ + "_c" + i] = true; }); save();
   $("#play").onclick = () => startExtendPlay(scr);
 }
 function startExtendPlay(scr) {
-  sess = { mode: "extend", i: 0, n: 6, right: 0, revealed: false };
+  sess = { mode: "extend", civ: S.civ, i: 0, n: 6, right: 0, revealed: false, pool: extendPool(S.civ) };
   nextExtend(scr);
 }
 function nextExtend(scr) {
   if (sess.i >= sess.n) {
-    if (sess.right >= 4) setStar("egypt", "extend");
+    if (sess.right >= 4) setStar(sess.civ, "extend");
     scr.className = "stage";
     scr.innerHTML = `<div class="qcard" style="text-align:center"><div style="font-size:52px">${sess.right >= 4 ? "🌟" : "💪"}</div>
       <div class="qtext">做对 ${sess.right}/${sess.n}</div>
-      <p style="font-size:14px;opacity:.8">${sess.right >= 4 ? "拓展星到手！你已经会读四千年前的数字了。" : "答对 4 题点亮拓展星，再来一次～"}</p>
+      <p style="font-size:14px;opacity:.8">${sess.right >= 4 ? "拓展星到手！这些都是课本外的本事。" : "答对 4 题点亮拓展星，再来一次～"}</p>
       <button class="btn wide" id="again">再来</button><button class="btn ghost wide" id="back">返回</button></div>`;
     sess = null;
     $("#again").onclick = () => startExtendPlay(scr); $("#back").onclick = () => back();
     return;
   }
-  // 交替出：象形数字 / 速算魔法
-  let prob;
-  if (sess.i % 2 === 0) prob = STATIONS.extend.egyptGen();
-  else { const tr = STATIONS.extend.tricks[Math.floor(Math.random() * STATIONS.extend.tricks.length)]; prob = tr.gen(); }
+  const prob = sess.pool[Math.floor(Math.random() * sess.pool.length)]();
   sess.revealed = false;
   scr.className = "stage";
   scr.innerHTML = `<div class="progress"><i style="width:${sess.i / sess.n * 100}%"></i></div>
-    <div class="qcard"><div class="qmeta"><span>${sess.i % 2 === 0 ? "𓏢 象形数字" : "✨ 速算魔法"}</span><span>第 ${sess.i + 1}/${sess.n}</span></div>
+    <div class="qcard"><div class="qmeta"><span>🚀 拓展练习</span><span>第 ${sess.i + 1}/${sess.n}</span></div>
     <div class="qtext">${prob.q}</div>
     <div class="answerbox"><input id="ans" type="number" inputmode="numeric" placeholder="答案" autocomplete="off"><button class="btn" id="ok">确定</button></div>
     <div class="feedback" id="fb"></div></div>
@@ -302,7 +302,7 @@ function nextExtend(scr) {
 function renderChallengeList(scr) {
   $("#title").textContent = "思维挑战";
   scr.className = "stage";
-  const list = STATIONS.challenge.map((c, i) => {
+  const list = ST().challenge.map((c, i) => {
     const done = S.challengeDone[c.id];
     return `<div class="readcard" data-i="${i}" style="cursor:pointer"><div class="h">${c.icon} ${esc(c.name)} ${"⭐".repeat(c.star)}${done ? ' <span style="color:#3ec98a;margin-left:auto">已破解 ✓</span>' : ''}</div>
       <div class="b" style="opacity:.7">${done ? "点开再想一遍，或看看还有没有别的思路" : "点开挑战 —— 先自己想，实在想不出再一条条看提示"}</div></div>`;
@@ -311,7 +311,7 @@ function renderChallengeList(scr) {
   scr.querySelectorAll(".readcard[data-i]").forEach(el => el.onclick = () => go("challengeRun", { sub: Number(el.dataset.i) }));
 }
 function renderChallenge(scr) {
-  const c = STATIONS.challenge[S.sub];
+  const civ = S.civ, c = ST(civ).challenge[S.sub];
   $("#title").textContent = c.name;
   scr.className = "stage";
   let body;
@@ -334,7 +334,7 @@ function renderChallenge(scr) {
   const reveal = () => {
     if (solved) return; solved = true;
     if (!S.challengeDone[c.id]) { S.challengeDone[c.id] = true; addCoins(8); markCorrect(); toast("破解思维挑战 +8 🪙");
-      const n = STATIONS.challenge.filter(x => S.challengeDone[x.id]).length; if (n >= 2) setStar("egypt", "challenge"); }
+      const n = ST(civ).challenge.filter(x => S.challengeDone[x.id]).length; if (n >= 2) setStar(civ, "challenge"); }
     $("#big").classList.remove("hidden"); $("#doneb").classList.remove("hidden"); $("#hintBtn").classList.add("hidden");
   };
   const showHint = () => {
@@ -395,14 +395,15 @@ function renderParent(scr) {
   const activeDays = Object.keys(S.history).length;
   const recent = Object.keys(S.history).sort().slice(-7).reverse()
     .map(d => `<div class="setrow"><span>${d.slice(5)}</span><b>做对 ${S.history[d].right} 题</b></div>`).join("") || `<div class="note">还没有学习记录。</div>`;
-  const mastered = STATIONS.core.filter(s => (S.srs[s.id] || {}).lv >= 4).length;
+  const allCore = Object.values(STATIONS).flatMap(s => s.core);
+  const mastered = allCore.filter(s => (S.srs[s.id] || {}).lv >= 4).length;
   scr.innerHTML = `<div class="panel"><h3>📊 学习概况（自动记录，无需打卡）</h3>
     <div class="setrow"><span>今天做对题数</span><b>${S.daily.correct}</b></div>
     <div class="setrow"><span>累计做对题目</span><b>${S.totalRight || 0}</b></div>
     <div class="setrow"><span>有学习记录的天数</span><b>${activeDays}</b></div>
     <div class="setrow"><span>已收集数学奇观</span><b>${Object.keys(S.wonders).length} / ${CIVS.length}</b></div>
-    <div class="setrow"><span>课内知识点已熟练</span><b>${mastered} / ${STATIONS.core.length}</b></div>
-    <div class="setrow"><span>待复习知识点(到期)</span><b>${srsDueList().length}</b></div></div>
+    <div class="setrow"><span>课内知识点已熟练</span><b>${mastered} / ${allCore.length}</b></div>
+    <div class="setrow"><span>待复习知识点(到期)</span><b>${srsDueAll().length}</b></div></div>
     <div class="panel"><h3>🗓️ 最近学习记录</h3>${recent}
     <div class="note">孩子想学就学，这里只默默记录她每天做对了多少，供您了解进度——不设连续打卡，避免压力。</div></div>
     <div class="panel"><h3>⚙️ 设置</h3>
