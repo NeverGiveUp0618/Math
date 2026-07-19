@@ -131,41 +131,47 @@ let activeModule="map", activeAt=Date.now();
 function trackTime(next){const now=Date.now(),sec=Math.min(120,Math.max(0,Math.round((now-activeAt)/1000))),d=S.timeLog[todayStr()]||(S.timeLog[todayStr()]={map:0,core:0,extend:0,challenge:0,exam:0});d[activeModule]=(d[activeModule]||0)+sec;activeModule=next||S.view;activeAt=now;if(sec)save();}
 
 function scratchPadHtml() {
-  return `<div class="scratch"><button class="scratch-toggle" type="button">✏️ 需要时打开草稿纸</button><div class="scratch-body hidden"><div class="scratch-tools"><button type="button" data-tool="pen" class="on">铅笔</button><button type="button" data-tool="eraser">橡皮</button><button type="button" data-tool="undo">撤销</button><button type="button" data-tool="clear">清空</button><button type="button" data-template="grid">方格</button><button type="button" data-template="vertical">竖式</button><button type="button" data-template="numberline">数轴</button></div><canvas class="grid" width="600" height="380" aria-label="手写草稿区"></canvas></div></div>`;
+  return `<div class="scratch"><button class="scratch-toggle" type="button">✏️ 需要时打开无限草稿纸</button><div class="scratch-body hidden"><div class="scratch-tools"><button type="button" data-tool="pen" class="on">✏️ 铅笔</button><button type="button" data-tool="eraser">🧽 橡皮</button><button type="button" data-tool="pan">✋ 拖动画布</button><button type="button" data-tool="undo">撤销</button><button type="button" data-tool="clear">清空笔迹</button><button type="button" data-template="blank">空白纸</button><button type="button" data-template="grid" class="on">方格</button><button type="button" data-template="vertical">竖式</button><button type="button" data-template="numberline">数轴</button></div><div class="scratch-tip">画布比窗口大很多；选择“拖动画布”后按住移动。橡皮只擦笔迹，不会擦掉纸张。</div><div class="scratch-viewport"><div class="scratch-world grid"><canvas width="2048" height="1536" aria-label="可拖动无限草稿区"></canvas></div></div></div></div>`;
 }
 function scratchKey(){return `${S.view}:${S.civ||"all"}:${examSess?examSess.book+":"+examSess.i:sess?sess.mode+":"+sess.i:S.sub||0}`;}
 function bindScratchPad(root) {
   const box = root.querySelector(".scratch"); if (!box) return;
-  const body = box.querySelector(".scratch-body"), canvas = box.querySelector("canvas");
+  const body = box.querySelector(".scratch-body"), canvas = box.querySelector("canvas"), world=box.querySelector(".scratch-world"), viewport=box.querySelector(".scratch-viewport");
   box.querySelector(".scratch-toggle").onclick = () => body.classList.toggle("hidden");
   if (/jsdom/i.test(navigator.userAgent || "")) return;
   const ctx = canvas.getContext("2d"); if (!ctx) return;
-  let drawing = false, eraser = false, undo=[]; const key=scratchKey();
-  const prior=S.scratchDrafts[key];if(prior){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0);img.src=prior;}
-  const remember=()=>{try{S.scratchDrafts[key]=canvas.toDataURL("image/webp",.72);localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){}};
+  let drawing=false,panning=false,tool="pen",undo=[],panStart=null;const key=scratchKey(),prior=S.scratchDrafts[key];
+  let offset={x:0,y:0},template="grid";
+  const clamp=()=>{const vw=viewport.clientWidth,vh=viewport.clientHeight;offset.x=Math.min(0,Math.max(vw-canvas.width,offset.x));offset.y=Math.min(0,Math.max(vh-canvas.height,offset.y));};
+  const place=()=>{clamp();world.style.transform=`translate(${offset.x}px,${offset.y}px)`;};
+  requestAnimationFrame(()=>{if(prior&&typeof prior==='object'&&prior.offset)offset=prior.offset;else offset={x:Math.round((viewport.clientWidth-canvas.width)/2),y:Math.round((viewport.clientHeight-canvas.height)/2)};place();});
+  if(prior){const src=typeof prior==='string'?prior:prior.image;template=typeof prior==='object'&&prior.template||"grid";world.className=`scratch-world ${template}`;box.querySelectorAll("[data-template]").forEach(b=>b.classList.toggle("on",b.dataset.template===template));if(src){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0);img.src=src;}}
+  const remember=()=>{try{S.scratchDrafts[key]={image:canvas.toDataURL("image/webp",.68),template,offset:{...offset}};const keys=Object.keys(S.scratchDrafts);while(keys.length>12)delete S.scratchDrafts[keys.shift()];localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){}};
   box.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => {
-    if (b.dataset.tool === "clear") { undo.push(canvas.toDataURL());ctx.clearRect(0, 0, canvas.width, canvas.height);remember();return; }
+    if (b.dataset.tool === "clear") { undo.push(canvas.toDataURL("image/webp",.68));ctx.clearRect(0, 0, canvas.width, canvas.height);remember();return; }
     if (b.dataset.tool === "undo") { const src=undo.pop();ctx.clearRect(0,0,canvas.width,canvas.height);if(src){const img=new Image();img.onload=()=>{ctx.drawImage(img,0,0);remember()};img.src=src}else remember();return; }
-    eraser = b.dataset.tool === "eraser"; box.querySelectorAll("[data-tool]").forEach(x => x.classList.toggle("on", x === b));
+    tool=b.dataset.tool;box.querySelectorAll("[data-tool]").forEach(x=>x.classList.toggle("on",x===b));viewport.classList.toggle("is-panning",tool==="pan");
   });
-  box.querySelectorAll("[data-template]").forEach(b=>b.onclick=()=>{canvas.className=b.dataset.template;});
+  box.querySelectorAll("[data-template]").forEach(b=>b.onclick=()=>{template=b.dataset.template;world.className=`scratch-world ${template}`;box.querySelectorAll("[data-template]").forEach(x=>x.classList.toggle("on",x===b));remember();});
   const point = e => { const r = canvas.getBoundingClientRect(), p = e.touches ? e.touches[0] : e; return [(p.clientX-r.left)*canvas.width/r.width,(p.clientY-r.top)*canvas.height/r.height]; };
-  const start = e => { drawing=true;undo.push(canvas.toDataURL());if(undo.length>12)undo.shift();const [x,y]=point(e); ctx.beginPath(); ctx.moveTo(x,y); e.preventDefault(); };
-  const move = e => { if(!drawing)return; const [x,y]=point(e); ctx.lineCap="round"; ctx.lineJoin="round"; ctx.lineWidth=eraser?28:4; ctx.strokeStyle=eraser?"#fff":"#655474"; ctx.lineTo(x,y); ctx.stroke(); e.preventDefault(); };
-  const stop = () => {if(drawing){drawing=false;remember();}};
-  canvas.addEventListener("pointerdown",start); canvas.addEventListener("pointermove",move); canvas.addEventListener("pointerup",stop); canvas.addEventListener("pointerleave",stop);
+  const start=e=>{if(tool==="pan"){panning=true;panStart={x:e.clientX-offset.x,y:e.clientY-offset.y};canvas.setPointerCapture?.(e.pointerId);e.preventDefault();return;}drawing=true;undo.push(canvas.toDataURL("image/webp",.68));if(undo.length>12)undo.shift();const[x,y]=point(e);ctx.beginPath();ctx.moveTo(x,y);canvas.setPointerCapture?.(e.pointerId);e.preventDefault();};
+  const move=e=>{if(panning){offset={x:e.clientX-panStart.x,y:e.clientY-panStart.y};place();e.preventDefault();return;}if(!drawing)return;const[x,y]=point(e);ctx.lineCap="round";ctx.lineJoin="round";ctx.lineWidth=tool==="eraser"?30:4;ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.strokeStyle="#655474";ctx.lineTo(x,y);ctx.stroke();e.preventDefault();};
+  const stop=e=>{if(panning){panning=false;remember();}if(drawing){drawing=false;ctx.globalCompositeOperation="source-over";remember();}try{canvas.releasePointerCapture?.(e.pointerId)}catch(_){}};
+  canvas.addEventListener("pointerdown",start);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",stop);canvas.addEventListener("pointercancel",stop);
 }
 function baibaiTip(text) { return `<div class="baibai-tip"><img src="assets/baibai-base.png" alt="白白"><span>${text}</span></div>`; }
 
 let nav = []; // 面包屑视图栈，用于返回
-function go(view, opts) { trackTime(view); nav.push({ view: S.view, civ: S.civ, sub: S.sub }); S.view = view; Object.assign(S, opts || {}); render(); }
-function back() { trackTime(); const p = nav.pop(); if (p) { S.view = p.view; S.civ = p.civ; S.sub = p.sub; } else S.view = "map"; activeModule=S.view; render(); }
+try { history.scrollRestoration="manual"; } catch(e) {}
+function restoreMathScroll(y){if(/jsdom/i.test(navigator.userAgent||""))return;const top=Math.max(0,Number(y)||0),restore=()=>window.scrollTo(0,top);restore();requestAnimationFrame(()=>{restore();requestAnimationFrame(restore)});}
+function go(view, opts) { trackTime(view); nav.push({ view: S.view, civ: S.civ, sub: S.sub, scrollY:window.scrollY }); S.view = view; Object.assign(S, opts || {}); render(); restoreMathScroll(0); }
+function back() { trackTime(); const p = nav.pop(); if (p) { S.view = p.view; S.civ = p.civ; S.sub = p.sub; } else S.view = "map"; activeModule=S.view; render(); restoreMathScroll(p&&p.scrollY); }
 
 /* ============================================================ 渲染 ============================================================ */
 function render() {
   paintPurse();
   const scr = $("#screen");
-  $("#backBtn").classList.toggle("hidden", ["map","review","exam","rewards"].includes(S.view));
+  $("#backBtn").classList.toggle("hidden", ["map","review","rewards"].includes(S.view));
   $("#learningHome").classList.toggle("hidden", !["map","review","exam","rewards"].includes(S.view));
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.v === S.view));
   if (S.view === "map") return renderMap(scr);
@@ -206,7 +212,7 @@ function renderMap(scr) {
     ${civs}<button class="math-parent-entry" id="mathParentEntry">🔐 家长设置</button>`;
   scr.querySelectorAll(".civ[data-civ]").forEach(el => el.onclick = () => go("station", { civ: el.dataset.civ }));
   $("#examBtn").onclick=()=>go("exam");
-  $("#mathParentEntry").onclick=()=>{nav=[];S.view="parent";render();};
+  $("#mathParentEntry").onclick=()=>go("parent");
 }
 
 /* ---------- 站内三层 ---------- */
@@ -437,7 +443,7 @@ function bookSkills(book){return CIVS.filter(c=>c.book===book).flatMap(c=>(STATI
 function renderExam(scr){
   $("#title").textContent="阶段测验"; scr.className="stage";
   if(!examSess){
-    scr.innerHTML=`<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">看看哪些本领已经住进脑袋里</div>每次15题，不倒计时。做错只会生成复习建议，不扣金币。</div></div><div class="qcard"><div class="qmeta"><span>选择教材</span><span>15题</span></div><div class="exam-picks">${["三上","三下","四上","四下","五上","五下","六上","六下"].map(b=>`<button class="exam-pick" data-book="${b}">${b}<br><small>${bookSkills(b).length}个知识点</small></button>`).join("")}</div></div>`;
+    scr.innerHTML=`<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">看看哪些本领已经住进脑袋里</div>按人教版数学常用单元整理，每次15题，不倒计时。做错只会生成复习建议，不扣金币。</div></div><div class="qcard"><div class="qmeta"><span>人教版数学 · 选择册次</span><span>15题</span></div><div class="exam-picks">${["三上","三下","四上","四下","五上","五下","六上","六下"].map(b=>`<button class="exam-pick" data-book="${b}">${b}<br><small>${bookSkills(b).length}个知识点</small></button>`).join("")}</div></div>`;
     scr.querySelectorAll("[data-book]").forEach(b=>b.onclick=()=>{const pool=bookSkills(b.dataset.book);examSess={book:b.dataset.book,i:0,n:15,right:0,wrong:[],cur:null,pool};nextExam(scr);}); return;
   }
   nextExam(scr);
@@ -478,7 +484,6 @@ const PARENT_AUTH_KEY="learningParentAuth_v1";
 let pinOK = sessionStorage.getItem(PARENT_AUTH_KEY)==="1";
 function renderParent(scr) {
   $("#title").textContent = "数学家长设置";
-  nav = [];
   scr.className = "parent";
   if (!pinOK) {
     scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学家长设置</h3><p class="note">三科总览请从学习导航进入；这里保留数学详细数据和设置。</p></div></div>

@@ -326,7 +326,7 @@ const STATIONS = {
 };
 
 /* ============================================================
- * 三至六年级八册教材完整拓展（保留原有五站存档 id，新站顺序接在后面）
+ * 三至六年级八册人教版数学常用单元拓展（保留原有五站存档 id，新站顺序接在后面）
  * 三上：测量/倍/分数/集合；三下：除法/位置/小数/统计
  * 四上：大数/角/除法；四下：四则/小数/图形/平均数
  * ============================================================ */
@@ -433,3 +433,29 @@ STATIONS.future={labels:{core:"六下《负数·比例·圆柱圆锥·统计》"
   {id:"fu_cone",icon:"🍦",name:"圆锥装水",star:3,type:"fill",q:"等底等高的圆柱能装12升水，圆锥能装多少升？",a:4,steps:["等底等高圆锥体积是圆柱的1/3。","12÷3=4升。"],big:"圆锥体积=1/3×底面积×高。"},
   {id:"fu_map",icon:"🗺️",name:"地图上的路",star:2,type:"fill",q:"比例尺1:100000，图上5厘米，实际距离是多少千米？",a:5,steps:["实际5×100000=500000厘米。","100000厘米=1千米，所以是5千米。"],big:"比例尺题最后要特别检查单位换算。"}
 ]};
+
+/* 高年级测验补全：按人教版数学常用单元拆成可独立测量的知识点。 */
+STATIONS.silk.core.push(
+  {id:"sl_position",name:"用数对确定位置",icon:"📍",gen(){const col=R(1,9),row=R(1,9);return{q:`小明坐在第 ${col} 列、第 ${row} 行，用数对表示时第一个数是多少？`,a:col,hint:"数对先写列，再写行"};}},
+  {id:"sl_prob",name:"可能性大小",icon:"🎲",gen(){const red=R(5,12),blue=R(1,4);return{q:`袋里有 ${red} 个红球、${blue} 个蓝球，任取一个，可能性更大的是哪种球？输入红球个数`,a:red,hint:"数量越多，被摸到的可能性越大"};}},
+  {id:"sl_triangle",name:"三角形面积",icon:"🔺",gen(){const b=R(4,16),h=R(3,12)*2;return{q:`三角形底 ${b} 厘米、高 ${h} 厘米，面积是多少平方厘米？`,a:b*h/2,hint:"三角形面积=底×高÷2"};}},
+  {id:"sl_tree",name:"植树问题",icon:"🌳",gen(){const gap=R(5,12),n=R(4,10);return{q:`一条长 ${gap*n} 米的小路，一端到另一端每隔 ${gap} 米栽一棵，两端都栽，共栽多少棵？`,a:n+1,hint:"两端都栽：棵数=间隔数+1"};}}
+);
+STATIONS.ocean.core.push(
+  {id:"oc_prime",name:"质数与合数",icon:"🔢",gen(){const n=pick([11,13,17,19,23,29]);return{q:`${n} 的因数只有1和它本身，它有几个因数？`,a:2,hint:"质数恰好有两个因数"};}},
+  {id:"oc_lcm_core",name:"最小公倍数",icon:"🔗",gen(){const a=pick([4,6,8]),b=pick([3,5,9]);let n=a;while(n%b)n+=a;return{q:`${a} 和 ${b} 的最小公倍数是多少？`,a:n,hint:"从较大数的倍数中找第一个公共倍数"};}},
+  {id:"oc_reduce",name:"约分",icon:"✂️",gen(){const g=R(2,6),a=pick([1,2,3]),b=pick([5,7,8]);return{q:`${a*g}/${b*g} 约成最简分数后，分母是多少？`,a:b,hint:"分子分母同时除以最大公因数"};}},
+  {id:"oc_capacity",name:"体积与容积换算",icon:"🧪",gen(){const l=R(2,12);return{q:`${l} 升等于多少立方分米？`,a:l,hint:"1升=1立方分米"};}}
+);
+STATIONS.space.core.push(
+  {id:"sp_fracdiv",name:"分数除法",icon:"➗",gen(){const a=R(2,6),b=R(a+1,9),k=R(2,6);return{q:`${a*k} ÷ ${a}/${b} =`,a:k*b,hint:"除以一个分数，等于乘它的倒数"};}},
+  {id:"sp_direction",name:"位置与方向（二）",icon:"🧭",gen(){const east=R(3,12),north=R(3,12);return{q:`从基地向东走 ${east} 千米，再向北走 ${north} 千米，路线总长多少千米？`,a:east+north,hint:"路线总长是各段长度之和"};}},
+  {id:"sp_circle_area",name:"圆的面积",icon:"⭕",gen(){const r=R(2,9);return{q:`圆的半径 ${r} 厘米，取π=3.14，面积是多少平方厘米？`,a:3.14*r*r,hint:"圆面积=π×半径²"};}},
+  {id:"sp_fan",name:"扇形统计图",icon:"📊",gen(){const total=pick([40,80,120,200]),pct=pick([20,25,50]);return{q:`总数是 ${total}，扇形图中某项占 ${pct}%，这一项有多少？`,a:total*pct/100,hint:"部分量=总量×百分比"};}}
+);
+STATIONS.future.core.push(
+  {id:"fu_discount",name:"折扣",icon:"🏷️",gen(){const price=pick([80,120,160,200]),discount=pick([5,8,9]);return{q:`原价 ${price} 元，打${discount}折后是多少元？`,a:price*discount/10,hint:"几折就是原价的百分之几十"};}},
+  {id:"fu_cyl_surface",name:"圆柱表面积",icon:"🥫",gen(){const r=R(2,5),h=R(3,9);return{q:`圆柱半径 ${r}、高 ${h} 厘米，取π=3.14，表面积是多少平方厘米？`,a:2*3.14*r*r+2*3.14*r*h,hint:"表面积=两个底面积+侧面积"};}},
+  {id:"fu_cone_core",name:"圆锥体积",icon:"🍦",gen(){const r=pick([3,6]),h=pick([3,6,9]);return{q:`圆锥底面半径 ${r}、高 ${h} 厘米，取π=3.14，体积是多少立方厘米？`,a:3.14*r*r*h/3,hint:"圆锥体积=底面积×高÷3"};}},
+  {id:"fu_inverse",name:"反比例",icon:"🔄",gen(){const people=R(3,8),days=R(4,10),more=people*2;return{q:`${people} 人完成一项任务要 ${days} 天，效率相同，${more} 人需要多少天？`,a:days/2,hint:"总工作量一定，人数扩大2倍，天数缩小到一半"};}}
+);

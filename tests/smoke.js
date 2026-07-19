@@ -31,7 +31,7 @@ ok("古埃及可点、其余上锁", $(".civ[data-civ='egypt']") && $(".civ.lock
 ok("奇观收藏栏存在", $(".wonderbar"));
 ok("底部菜单只保留探险/复习/测验/收藏", window.document.querySelectorAll("#nav button").length===4 && !$("#nav").textContent.includes("家长"));
 ok("八册教材扩展为13个文明站", window.eval("CIVS.length") === 13);
-ok("三至六年级八册都有多个知识点", window.eval("['三上','三下','四上','四下','五上','五下','六上','六下'].every(b=>CIVS.filter(c=>c.book===b).flatMap(c=>STATIONS[c.id].core).length>=4)"));
+ok("三至六年级八册都至少覆盖8个知识点", window.eval("['三上','三下','四上','四下','五上','五下','六上','六下'].every(b=>CIVS.filter(c=>c.book===b).flatMap(c=>STATIONS[c.id].core).length>=8)"));
 
 console.log("— 进入古埃及站 —");
 click($(".civ[data-civ='egypt']"));
@@ -43,6 +43,7 @@ click(window.document.querySelector(".depth[data-d='core']"));
 ok("计算题带内置草稿区", $(".scratch canvas"));
 ok("答题框不会自动获得焦点", window.document.activeElement !== $("#ans"));
 ok("草稿区有撤销、方格、竖式和数轴", $("[data-tool='undo']") && $("[data-template='grid']") && $("[data-template='vertical']") && $("[data-template='numberline']"));
+ok("草稿区有可拖动画布、橡皮和空白纸", $("[data-tool='pan']") && $("[data-tool='eraser']") && $("[data-template='blank']") && $(".scratch-viewport .scratch-world"));
 const coinStart = window.eval("S.coins");
 let guard = 0;
 while ($("#ans") && guard++ < 30) {
@@ -87,6 +88,7 @@ ok("挑战奖励金币入账", window.eval("S.challengeDone.eg_gauss === true"))
 console.log("— 阶段测验与个性化 —");
 window.eval("examSess=null; nav=[]; S.view='exam'; render();");
 ok("阶段测验提供八册选择且明确不倒计时", window.document.querySelectorAll("[data-book]").length===8 && $("#screen").textContent.includes("不倒计时"));
+ok("阶段测验显示顶栏返回按钮", !$("#backBtn").classList.contains("hidden"));
 click($("[data-book='六下']"));
 ok("测验题带草稿且输入框不自动聚焦", $(".scratch") && window.document.activeElement !== $("#ans"));
 guard=0;while($("#ans")&&guard++<20){const a=window.eval("examSess.cur.prob.a");$("#ans").value=String(a);click($("#ok"));if($("#nextb")&&!$("#nextb").classList.contains("hidden"))click($("#nextb"));}
