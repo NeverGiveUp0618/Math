@@ -44,6 +44,7 @@ ok("计算题带内置草稿区", $(".scratch canvas"));
 ok("答题框不会自动获得焦点", window.document.activeElement !== $("#ans"));
 ok("草稿区有撤销、方格、竖式和数轴", $("[data-tool='undo']") && $("[data-template='grid']") && $("[data-template='vertical']") && $("[data-template='numberline']"));
 ok("草稿区有可拖动画布、橡皮和空白纸", $("[data-tool='pan']") && $("[data-tool='eraser']") && $("[data-template='blank']") && $(".scratch-viewport .scratch-world"));
+ok("草稿纸默认选择拖动画布而不是铅笔", $("[data-tool='pan']").classList.contains("on") && !$("[data-tool='pen']").classList.contains("on"));
 const coinStart = window.eval("S.coins");
 let guard = 0;
 while ($("#ans") && guard++ < 30) {
