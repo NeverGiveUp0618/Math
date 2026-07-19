@@ -9,6 +9,8 @@ const addDays = (str, n) => { const d = new Date(str); d.setDate(d.getDate() + n
 /* ---------- 存档 + 共享钱包（与语文/英语两站互通） ---------- */
 const LS_KEY = "mathQuest_v1";
 const WALLET_KEY = "sharedWallet_v1";
+const CARD_DAILY_KEY = "sharedCardDaily_v1";
+const CARD_DAILY_LIMIT = 5;
 const SRS_STEPS = [1, 2, 4, 7, 15, 30]; // lv1..6 的复习间隔（天）
 
 function defState() {
@@ -47,6 +49,8 @@ function walletIn() {
   walletOut();
 }
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} walletOut(); }
+function mathCardDaily(){let d=null;try{d=JSON.parse(localStorage.getItem(CARD_DAILY_KEY)||"null")}catch(e){}if(!d||d.date!==todayStr())d={date:todayStr(),english:0,chinese:0,math:0,pendingChinese:0,pendingMath:0};["english","chinese","math","pendingChinese","pendingMath"].forEach(k=>d[k]=Math.max(0,Number(d[k])||0));return d;}
+function grantMathCard(){const d=mathCardDaily();if(d.math>=CARD_DAILY_LIMIT)return false;d.math++;d.pendingMath++;try{localStorage.setItem(CARD_DAILY_KEY,JSON.stringify(d))}catch(e){}return true;}
 
 /* ---------- 奖励 ---------- */
 function addCoins(n) {
@@ -69,6 +73,7 @@ function markCorrect() {
   const t = todayStr();
   S.history[t] = S.history[t] || { right: 0 };
   S.history[t].right++;
+  grantMathCard();
   save();
 }
 function markAttempt(id, ok) {

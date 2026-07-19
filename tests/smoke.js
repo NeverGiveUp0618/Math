@@ -32,6 +32,9 @@ ok("奇观收藏栏存在", $(".wonderbar"));
 ok("底部菜单只保留探险/复习/测验/收藏", window.document.querySelectorAll("#nav button").length===4 && !$("#nav").textContent.includes("家长"));
 ok("八册教材扩展为13个文明站", window.eval("CIVS.length") === 13);
 ok("三至六年级八册都至少覆盖8个知识点", window.eval("['三上','三下','四上','四下','五上','五下','六上','六下'].every(b=>CIVS.filter(c=>c.book===b).flatMap(c=>STATIONS[c.id].core).length>=8)"));
+ok("每个年级册至少有4道思维挑战", window.eval("['三上','三下','四上','四下','五上','五下','六上','六下'].every(b=>CIVS.filter(c=>c.book===b).flatMap(c=>STATIONS[c.id].challenge).length>=4)"));
+window.eval("localStorage.removeItem(CARD_DAILY_KEY);Array.from({length:7},()=>grantMathCard())");
+ok("数学每日独立最多获得5张卡", window.eval("mathCardDaily().math===5&&mathCardDaily().pendingMath===5"));
 
 console.log("— 进入古埃及站 —");
 click($(".civ[data-civ='egypt']"));
