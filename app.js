@@ -165,8 +165,8 @@ function back() { trackTime(); const p = nav.pop(); if (p) { S.view = p.view; S.
 function render() {
   paintPurse();
   const scr = $("#screen");
-  $("#backBtn").classList.toggle("hidden", ["map","review","exam","rewards","parent"].includes(S.view));
-  $("#learningHome").classList.toggle("hidden", !["map","review","exam","rewards","parent"].includes(S.view));
+  $("#backBtn").classList.toggle("hidden", ["map","review","exam","rewards"].includes(S.view));
+  $("#learningHome").classList.toggle("hidden", !["map","review","exam","rewards"].includes(S.view));
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.v === S.view));
   if (S.view === "map") return renderMap(scr);
   if (S.view === "station") return renderStation(scr);
@@ -483,9 +483,10 @@ function renderParent(scr) {
   if (!pinOK) {
     scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学家长设置</h3><p class="note">三科总览请从学习导航进入；这里保留数学详细数据和设置。</p></div></div>
       <div class="pinpad"><input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"></div>
-      <button class="btn wide" id="go">进入</button><a class="btn ghost wide" href="https://nevergiveup0618.github.io/learning/?parent=1">← 返回统一家长中心</a></div>`;
+      <button class="btn wide" id="go">进入</button><button class="btn ghost wide" id="parentBackMath">← 返回数学奇境</button><a class="btn ghost wide parent-exit-center" href="https://nevergiveup0618.github.io/learning/?parent=1">🏠 返回统一家长中心</a></div>`;
     const go2 = () => { if ($("#pin").value === PARENT_PIN) { pinOK = true; sessionStorage.setItem(PARENT_AUTH_KEY,"1"); renderParent(scr); } else toast("密码不对"); };
     $("#go").onclick = go2; $("#pin").onkeydown = e => { if (e.key === "Enter") go2(); };
+    $("#parentBackMath").onclick = () => { S.view="map"; nav=[]; render(); };
     return;
   }
   const activeDays = Object.keys(S.history).length;
@@ -499,7 +500,7 @@ function renderParent(scr) {
   const sumTime=(k,key)=>Number((S.timeLog[k]||{})[key]||0), weekKeys=["map","core","extend","challenge","exam"];
   const todaySecs=weekKeys.reduce((a,k)=>a+sumTime(todayStr(),k),0),weekSecs=keys.reduce((a,d)=>a+weekKeys.reduce((n,k)=>n+sumTime(d,k),0),0);
   const examRows=Object.entries(S.exams).flatMap(([book,rows])=>(rows||[]).map(x=>({book,...x}))).slice(-5).reverse();
-  scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学详细报告</h3><p class="note">三科总览、钱包和报告图片已集中到学习导航页。</p></div></div><a class="btn wide" href="https://nevergiveup0618.github.io/learning/?parent=1">← 返回统一家长中心</a></div>
+  scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学详细报告</h3><p class="note">设置会自动保存。看完可直接回数学，也可去三科统一家长中心。</p></div></div><button class="btn wide" id="parentBackMath">← 返回数学奇境</button><a class="btn ghost wide parent-exit-center" href="https://nevergiveup0618.github.io/learning/?parent=1">🏠 返回统一家长中心</a></div>
     <div class="panel" id="math-report"><h3>📊 数学学习概况（自动记录，无需打卡）</h3>
     <div class="setrow"><span>今天有效学习</span><b>${fmtSec(todaySecs)}</b></div>
     <div class="setrow"><span>最近7天有效学习</span><b>${fmtSec(weekSecs)}</b></div>
@@ -520,6 +521,7 @@ function renderParent(scr) {
     <div class="panel"><h3>ℹ️ 设计说明</h3><p class="note">数学奇境用于保持兴趣并自然拓展：课本知识练熟后，继续接触数学史、生活数学与思维方法。这里不设每日任务和连续打卡，孩子随时想来都可以。金币和转盘券与语文、英语互通。</p></div>`;
   $("#tm0").onclick = () => { S.testMode = false; CIVS.forEach(c => { if (c.locked) delete S.unlocked[c.id]; }); save(); renderParent(scr); };
   $("#tm1").onclick = () => { S.testMode = true; CIVS.forEach(c => S.unlocked[c.id] = true); save(); renderParent(scr); };
+  $("#parentBackMath").onclick = () => { S.view="map"; nav=[]; render(); };
 }
 
 /* ---------- 导航 ---------- */

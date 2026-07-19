@@ -138,6 +138,9 @@ window.eval("pinOK=true; nav=[]; S.view='parent'; render();");
 ok("家长概况显示", $("#screen").innerHTML.includes("学习概况"));
 ok("无打卡天数计数器", !$("#screen").innerHTML.includes("打卡天数"));
 ok("明确告知不设打卡压力", $("#screen").innerHTML.includes("无需打卡") || $("#screen").innerHTML.includes("不设连续打卡"));
+ok("家长后台同时提供返回数学和统一家长中心", $("#parentBackMath") && $("#screen").textContent.includes("返回统一家长中心"));
+$("#parentBackMath").click();
+ok("返回数学直接回数学首页且无需重新输入密码", window.eval("S.view")==="map" && window.eval("pinOK")===true);
 
 console.log("— 宝库页 —");
 window.eval("nav=[]; S.view='rewards'; render();");
