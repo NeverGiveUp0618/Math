@@ -136,7 +136,7 @@ let activeModule="map", activeAt=Date.now();
 function trackTime(next){const now=Date.now(),sec=Math.min(120,Math.max(0,Math.round((now-activeAt)/1000))),d=S.timeLog[todayStr()]||(S.timeLog[todayStr()]={map:0,core:0,extend:0,challenge:0,exam:0});d[activeModule]=(d[activeModule]||0)+sec;activeModule=next||S.view;activeAt=now;if(sec)save();}
 
 function scratchPadHtml() {
-  return `<div class="scratch"><button class="scratch-toggle" type="button">✏️ 需要时打开无限草稿纸</button><div class="scratch-body hidden"><div class="scratch-tools"><button type="button" data-tool="pen">✏️ 铅笔</button><button type="button" data-tool="eraser">🧽 橡皮</button><button type="button" data-tool="pan" class="on">✋ 拖动画布</button><button type="button" data-tool="undo">撤销</button><button type="button" data-tool="clear">清空笔迹</button><button type="button" data-template="blank">空白纸</button><button type="button" data-template="grid" class="on">方格</button><button type="button" data-template="vertical">竖式</button><button type="button" data-template="numberline">数轴</button></div><div class="scratch-tip">默认是拖动画布；需要书写时再点“铅笔”。橡皮只擦笔迹，不会擦掉纸张。</div><div class="scratch-viewport is-panning"><div class="scratch-world grid"><canvas width="2048" height="1536" aria-label="可拖动无限草稿区"></canvas></div></div></div></div>`;
+  return `<div class="scratch"><button class="scratch-toggle" type="button">✏️ 需要时打开无限草稿纸</button><div class="scratch-body hidden"><div class="scratch-tools"><button type="button" data-tool="pen">✏️ 铅笔</button><button type="button" data-tool="eraser">🧽 橡皮</button><button type="button" data-tool="pan" class="on">✋ 拖动画布</button><button type="button" data-tool="undo">撤销</button><button type="button" data-tool="clear">清空笔迹</button><button type="button" data-template="blank">空白纸</button><button type="button" data-template="grid" class="on">方格</button><button type="button" data-template="vertical">竖式</button><button type="button" data-template="fraction">分数</button><button type="button" data-template="numberline">数轴</button></div><div class="scratch-tip">默认是拖动画布；需要书写时再点“铅笔”。橡皮只擦笔迹，不会擦掉纸张。</div><div class="scratch-viewport is-panning"><div class="scratch-world grid"><canvas width="2048" height="1536" aria-label="可拖动无限草稿区"></canvas></div></div></div></div>`;
 }
 function scratchKey(){return `${S.view}:${S.civ||"all"}:${examSess?examSess.book+":"+examSess.i:sess?sess.mode+":"+sess.i:S.sub||0}`;}
 function bindScratchPad(root) {
@@ -280,15 +280,23 @@ function nextCore(scr) {
     <button class="btn ghost wide hidden" id="nextb">下一题 ›</button>`;
   const input = $("#ans");
   bindScratchPad(scr);
+  let tries = 0;
   const submit = () => {
     if (sess.revealed) return;
     const v = input.value.trim();
     if (v === "") return;
     const val = Number(v), ok = val === prob.a;
+    const fb = $("#fb");
+    if (!ok && tries++ === 0) {
+      const why = prob.trap && val === prob.trap.val ? `我猜你是——${prob.trap.why}。` : "";
+      fb.className = "feedback no show";
+      fb.innerHTML = `先不公布答案。${why}${why ? "<br>" : ""}${prob.hint || "换一种方法，在草稿纸上再试一步。"}<br><b>你还可以再答一次。</b>`;
+      input.value = "";
+      return;
+    }
     sess.revealed = true;
     markAttempt(skill.id,ok);
     srsGrade(skill.id, ok);
-    const fb = $("#fb");
     if (ok) {
       sess.right++; markCorrect(); addCoins(2);
       fb.className = "feedback ok show"; fb.innerHTML = `找到了！白白也看懂你的办法啦 🎉 <b>+2 🪙</b>` + (prob.hint ? `<br><span style="opacity:.75">小贴士：${prob.hint}</span>` : "");
