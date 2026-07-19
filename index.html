@@ -14,7 +14,7 @@
   --cream:#fffdfb; --glass:rgba(255,255,255,.74); --glass-2:rgba(255,255,255,.58);
   --line:rgba(217,160,102,.32);                       /* 玫瑰金细线 */
   --good:#4bbf8f; --good-ink:#2f8f68; --bad:#ec7a97; --bad-ink:#c14e6f;
-  --serif:"Georgia","STKaiti","Songti SC","PingFang SC",serif;
+  --serif:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
@@ -28,7 +28,7 @@ body{
     linear-gradient(158deg,#fffaf6 0%,#fbeef6 46%,#efe8fc 100%);
   background-attachment:fixed;
 }
-#app{max-width:520px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:80px}
+#app{max-width:760px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:88px}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 .hidden{display:none!important}
 
@@ -39,6 +39,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   box-shadow:0 4px 20px rgba(180,130,170,.12)}
 .topbar .back{font-size:26px;color:var(--lav-d);width:32px;line-height:1}
 .topbar h1{flex:1;margin:0;font-family:var(--serif);font-size:19px;font-weight:700;
+  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   letter-spacing:.06em;color:#6a4f6e;
   background:linear-gradient(100deg,var(--pink-d),var(--lav-d));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .purse{display:flex;gap:8px;font-size:13px;font-weight:800}
@@ -151,7 +152,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .note b{color:#6f5f77}
 
 /* ---------- 底部导航 ---------- */
-.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:760px;
   display:flex;background:linear-gradient(180deg,rgba(255,251,248,.9),rgba(255,246,250,.98));
   border-top:1px solid rgba(217,160,102,.2);box-shadow:0 -4px 20px rgba(180,130,170,.1);
   padding-bottom:env(safe-area-inset-bottom);z-index:30}
@@ -173,10 +174,22 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   padding:12px 22px;border-radius:30px;font-size:14px;font-weight:600;z-index:60;opacity:0;
   transition:opacity .25s;pointer-events:none;max-width:88%;box-shadow:0 10px 28px rgba(184,124,190,.4)}
 .toast.show{opacity:.98}
+
+/* 2026 儿童友好视觉：清晰、柔软、不制造进度压力 */
+.learning-home{display:inline-flex;align-items:center;gap:6px;margin:12px 16px 0;padding:10px 15px;border-radius:18px;background:rgba(255,255,255,.86);border:1px solid rgba(255,255,255,.95);box-shadow:0 8px 24px rgba(132,101,165,.13);font-size:13px;font-weight:800;color:#8063a0;text-decoration:none}
+.guide.baibai{align-items:flex-start;padding:16px}.guide.baibai img{width:86px;height:86px;object-fit:contain;flex:none;filter:drop-shadow(0 7px 10px rgba(110,76,84,.16))}.guide .hello{font-size:18px;font-weight:900;color:#76568f;margin-bottom:4px}.guide .soft{font-size:12px;color:#998aa2;margin-top:5px}
+.map-hero{padding:8px 0 2px}.map-hero h2{font-size:27px;line-height:1.25;margin:0 0 7px;color:#55415e}.map-hero p{margin:0;font-size:14px;color:#8b7b93;line-height:1.65}
+.scratch{margin-top:15px;border:1px solid rgba(154,130,212,.22);border-radius:18px;overflow:hidden;background:rgba(255,255,255,.68)}
+.scratch-toggle{width:100%;padding:12px 15px;text-align:left;font-weight:800;color:#796394}.scratch-body{padding:10px}.scratch-tools{display:flex;gap:8px;margin-bottom:8px}.scratch-tools button{padding:7px 12px;border-radius:11px;background:#f0e9fb;font-weight:700;color:#725d8d}.scratch-tools button.on{background:#9a82d4;color:white}.scratch canvas{width:100%;height:190px;display:block;border-radius:12px;background-color:#fff;background-image:linear-gradient(#e9e2f2 1px,transparent 1px),linear-gradient(90deg,#e9e2f2 1px,transparent 1px);background-size:24px 24px;touch-action:none}
+.baibai-tip{display:flex;align-items:center;gap:10px;margin-top:15px;padding:11px 13px;border-radius:16px;background:linear-gradient(135deg,#fff3f7,#f2edff);font-size:13px;line-height:1.5;color:#705f78}.baibai-tip img{width:44px;height:44px;object-fit:contain}
+.subject-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.subject-card{padding:14px 10px;border-radius:17px;background:linear-gradient(145deg,#fff7fa,#f5f0ff);text-align:center;text-decoration:none;color:#695773;border:1px solid rgba(217,160,102,.2)}.subject-card b{display:block;margin:5px 0 2px}.subject-card small{color:#9a8aa2}.parent-head{display:flex;align-items:center;gap:12px}.parent-head img{width:72px;height:72px;object-fit:contain}
+@media(min-width:620px){.map{display:grid;grid-template-columns:1fr 1fr;gap:15px}.map>.guide,.map>.wonderbar,.map>.map-hero{grid-column:1/-1}.civ{margin-bottom:0}.depths{display:grid;grid-template-columns:1fr 1fr;gap:15px}.depths>.guide{grid-column:1/-1}.depth{margin-bottom:0}.stage{max-width:650px;margin:auto}}
+@media(max-width:430px){.topbar{padding-left:12px;padding-right:12px}.topbar h1{font-size:17px}.purse{gap:4px}.chip{padding:5px 8px}.guide.baibai img{width:76px;height:76px}.subject-grid{grid-template-columns:1fr}.subject-card{display:flex;align-items:center;justify-content:space-between;text-align:left;padding:12px 15px}}
 </style>
 </head>
 <body>
 <div id="app">
+  <a class="learning-home" id="learningHome" href="https://nevergiveup0618.github.io/learning/">← 返回学习导航</a>
   <div class="topbar">
     <button class="back hidden" id="backBtn">‹</button>
     <h1 id="title">数学奇境</h1>

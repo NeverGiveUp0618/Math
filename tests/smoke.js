@@ -25,7 +25,8 @@ const click = el => { const e = window.document.createEvent("MouseEvents"); e.in
 
 console.log("— 启动 —");
 ok("首页标题=数学奇境", $("#title").textContent === "数学奇境");
-ok("渲染出向导欧几", $("#screen").innerHTML.includes("欧几"));
+ok("渲染出白白学习伙伴", $("#screen img[alt='白白']"));
+ok("首页文案无比较压力", !$("#screen").innerHTML.includes("脱颖而出"));
 ok("古埃及可点、其余上锁", $(".civ[data-civ='egypt']") && $(".civ.locked"));
 ok("奇观收藏栏存在", $(".wonderbar"));
 
@@ -36,6 +37,8 @@ ok("返回键出现", !$("#backBtn").classList.contains("hidden"));
 
 console.log("— 课内夯实：跑满一轮全答对 —");
 click(window.document.querySelector(".depth[data-d='core']"));
+ok("计算题带内置草稿区", $(".scratch canvas"));
+ok("答题框不会自动获得焦点", window.document.activeElement !== $("#ans"));
 const coinStart = window.eval("S.coins");
 let guard = 0;
 while ($("#ans") && guard++ < 30) {
