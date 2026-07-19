@@ -49,6 +49,7 @@ ok("草稿区有撤销、方格、竖式和数轴", $("[data-tool='undo']") && $
 ok("草稿区有分数专用纸", $("[data-template='fraction']"));
 ok("草稿区有可拖动画布、橡皮和空白纸", $("[data-tool='pan']") && $("[data-tool='eraser']") && $("[data-template='blank']") && $(".scratch-viewport .scratch-world"));
 ok("草稿纸默认选择拖动画布而不是铅笔", $("[data-tool='pan']").classList.contains("on") && !$("[data-tool='pen']").classList.contains("on"));
+ok("草稿纸支持缩小、放大和回到中心", $("[data-zoom='out']") && $("[data-zoom='in']") && $("[data-zoom='reset']"));
 const coinStart = window.eval("S.coins");
 const firstAnswer=window.eval("sess.cur.prob.a");
 $("#ans").value=String(Number(firstAnswer)+999);click($("#ok"));
