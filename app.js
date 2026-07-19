@@ -165,11 +165,11 @@ function renderStation(scr) {
   const st = stStars(S.civ), L = station.labels;
   scr.innerHTML = `
     <div class="guide"><div class="ow">🦉</div><div class="bubble">${esc(c.blurb)}</div></div>
-    <div class="depth" style="--c:#3ec98a" data-d="core"><div class="ico">🌱</div>
+    <div class="depth" style="--c:#f2a5c4" data-d="core"><div class="ico">🌸</div>
       <div><div class="nm">课内夯实</div><div class="ds">${esc(L.core)}</div></div>${st.core ? '<span class="done">✓</span>' : ''}</div>
-    <div class="depth" style="--c:#e0a13c" data-d="extend"><div class="ico">🚀</div>
+    <div class="depth" style="--c:#e6b98f" data-d="extend"><div class="ico">🚀</div>
       <div><div class="nm">课外拓展</div><div class="ds">${esc(L.extend)}</div></div>${st.extend ? '<span class="done">✓</span>' : ''}</div>
-    <div class="depth" style="--c:#9b7bd6" data-d="challenge"><div class="ico">🧠</div>
+    <div class="depth" style="--c:#b8a4e3" data-d="challenge"><div class="ico">🧠</div>
       <div><div class="nm">思维挑战</div><div class="ds">${esc(L.challenge)}</div></div>${st.challenge ? '<span class="done">✓</span>' : ''}</div>`;
   scr.querySelectorAll(".depth").forEach(el => el.onclick = () => {
     const d = el.dataset.d;
