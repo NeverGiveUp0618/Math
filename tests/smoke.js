@@ -30,8 +30,8 @@ ok("首页文案无比较压力", !$("#screen").innerHTML.includes("脱颖而出
 ok("古埃及可点、其余上锁", $(".civ[data-civ='egypt']") && $(".civ.locked"));
 ok("奇观收藏栏存在", $(".wonderbar"));
 ok("底部菜单只保留探险/复习/测验/收藏", window.document.querySelectorAll("#nav button").length===4 && !$("#nav").textContent.includes("家长"));
-ok("四册教材扩展为9个文明站", window.eval("CIVS.length") === 9);
-ok("三上三下四上四下都有多个知识点", window.eval("['三上','三下','四上','四下'].every(b=>CIVS.filter(c=>c.book===b).flatMap(c=>STATIONS[c.id].core).length>=6)"));
+ok("八册教材扩展为13个文明站", window.eval("CIVS.length") === 13);
+ok("三至六年级八册都有多个知识点", window.eval("['三上','三下','四上','四下','五上','五下','六上','六下'].every(b=>CIVS.filter(c=>c.book===b).flatMap(c=>STATIONS[c.id].core).length>=4)"));
 
 console.log("— 进入古埃及站 —");
 click($(".civ[data-civ='egypt']"));
@@ -86,11 +86,11 @@ ok("挑战奖励金币入账", window.eval("S.challengeDone.eg_gauss === true"))
 
 console.log("— 阶段测验与个性化 —");
 window.eval("examSess=null; nav=[]; S.view='exam'; render();");
-ok("阶段测验提供四册选择且明确不倒计时", window.document.querySelectorAll("[data-book]").length===4 && $("#screen").textContent.includes("不倒计时"));
-click($("[data-book='四上']"));
+ok("阶段测验提供八册选择且明确不倒计时", window.document.querySelectorAll("[data-book]").length===8 && $("#screen").textContent.includes("不倒计时"));
+click($("[data-book='六下']"));
 ok("测验题带草稿且输入框不自动聚焦", $(".scratch") && window.document.activeElement !== $("#ans"));
 guard=0;while($("#ans")&&guard++<20){const a=window.eval("examSess.cur.prob.a");$("#ans").value=String(a);click($("#ok"));if($("#nextb")&&!$("#nextb").classList.contains("hidden"))click($("#nextb"));}
-ok("15题测验形成报告", $("#screen").textContent.includes("阶段测验完成") && window.eval("S.exams['四上'].length")===1);
+ok("六下15题测验形成报告", $("#screen").textContent.includes("六下阶段测验完成") && window.eval("S.exams['六下'].length")===1);
 ok("答题统计可用于个性化", window.eval("Object.keys(S.attempts).length")>0);
 
 console.log("— 数据完整性：遍历全部站点题目 —");

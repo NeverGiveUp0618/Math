@@ -203,9 +203,10 @@ function renderMap(scr) {
   scr.innerHTML = `<div class="map-hero"><h2>今天想解开哪个数学秘密？</h2><p>从课本出发，再多走一步。每一次尝试都算一次新发现。</p></div><div class="guide baibai">${baibaiAvatar()}<div class="bubble">${greet}</div></div>
     <div class="recommend"><b>🐾 白白的小建议</b><span>${recommend}</span><button class="btn" id="examBtn">📝 阶段测验</button></div>
     <div class="wonderbar"><div class="t">🏺 数学奇观收藏（集齐一站的三颗星就能点亮）</div><div class="row">${wrow}</div></div>
-    ${civs}`;
+    ${civs}<button class="math-parent-entry" id="mathParentEntry">🔐 家长设置</button>`;
   scr.querySelectorAll(".civ[data-civ]").forEach(el => el.onclick = () => go("station", { civ: el.dataset.civ }));
   $("#examBtn").onclick=()=>go("exam");
+  $("#mathParentEntry").onclick=()=>{nav=[];S.view="parent";render();};
 }
 
 /* ---------- 站内三层 ---------- */
@@ -436,7 +437,7 @@ function bookSkills(book){return CIVS.filter(c=>c.book===book).flatMap(c=>(STATI
 function renderExam(scr){
   $("#title").textContent="阶段测验"; scr.className="stage";
   if(!examSess){
-    scr.innerHTML=`<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">看看哪些本领已经住进脑袋里</div>每次15题，不倒计时。做错只会生成复习建议，不扣金币。</div></div><div class="qcard"><div class="qmeta"><span>选择教材</span><span>15题</span></div><div class="exam-picks">${["三上","三下","四上","四下"].map(b=>`<button class="exam-pick" data-book="${b}">${b}<br><small>${bookSkills(b).length}个知识点</small></button>`).join("")}</div></div>`;
+    scr.innerHTML=`<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">看看哪些本领已经住进脑袋里</div>每次15题，不倒计时。做错只会生成复习建议，不扣金币。</div></div><div class="qcard"><div class="qmeta"><span>选择教材</span><span>15题</span></div><div class="exam-picks">${["三上","三下","四上","四下","五上","五下","六上","六下"].map(b=>`<button class="exam-pick" data-book="${b}">${b}<br><small>${bookSkills(b).length}个知识点</small></button>`).join("")}</div></div>`;
     scr.querySelectorAll("[data-book]").forEach(b=>b.onclick=()=>{const pool=bookSkills(b.dataset.book);examSess={book:b.dataset.book,i:0,n:15,right:0,wrong:[],cur:null,pool};nextExam(scr);}); return;
   }
   nextExam(scr);
@@ -473,7 +474,8 @@ function renderRewards(scr) {
 }
 
 /* ---------- 👨‍👩‍👧 家长 ---------- */
-let pinOK = false;
+const PARENT_AUTH_KEY="learningParentAuth_v1";
+let pinOK = sessionStorage.getItem(PARENT_AUTH_KEY)==="1";
 function renderParent(scr) {
   $("#title").textContent = "数学家长设置";
   nav = [];
@@ -481,8 +483,8 @@ function renderParent(scr) {
   if (!pinOK) {
     scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学家长设置</h3><p class="note">三科总览请从学习导航进入；这里保留数学详细数据和设置。</p></div></div>
       <div class="pinpad"><input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"></div>
-      <button class="btn wide" id="go">进入</button></div>`;
-    const go2 = () => { if ($("#pin").value === PARENT_PIN) { pinOK = true; renderParent(scr); } else toast("密码不对"); };
+      <button class="btn wide" id="go">进入</button><a class="btn ghost wide" href="https://nevergiveup0618.github.io/learning/?parent=1">← 返回统一家长中心</a></div>`;
+    const go2 = () => { if ($("#pin").value === PARENT_PIN) { pinOK = true; sessionStorage.setItem(PARENT_AUTH_KEY,"1"); renderParent(scr); } else toast("密码不对"); };
     $("#go").onclick = go2; $("#pin").onkeydown = e => { if (e.key === "Enter") go2(); };
     return;
   }
@@ -497,7 +499,7 @@ function renderParent(scr) {
   const sumTime=(k,key)=>Number((S.timeLog[k]||{})[key]||0), weekKeys=["map","core","extend","challenge","exam"];
   const todaySecs=weekKeys.reduce((a,k)=>a+sumTime(todayStr(),k),0),weekSecs=keys.reduce((a,d)=>a+weekKeys.reduce((n,k)=>n+sumTime(d,k),0),0);
   const examRows=Object.entries(S.exams).flatMap(([book,rows])=>(rows||[]).map(x=>({book,...x}))).slice(-5).reverse();
-  scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学详细报告</h3><p class="note">三科总览、钱包和报告图片已集中到学习导航页。</p></div></div><a class="btn wide" href="https://nevergiveup0618.github.io/learning/">打开统一家长中心</a></div>
+  scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学详细报告</h3><p class="note">三科总览、钱包和报告图片已集中到学习导航页。</p></div></div><a class="btn wide" href="https://nevergiveup0618.github.io/learning/?parent=1">← 返回统一家长中心</a></div>
     <div class="panel" id="math-report"><h3>📊 数学学习概况（自动记录，无需打卡）</h3>
     <div class="setrow"><span>今天有效学习</span><b>${fmtSec(todaySecs)}</b></div>
     <div class="setrow"><span>最近7天有效学习</span><b>${fmtSec(weekSecs)}</b></div>
