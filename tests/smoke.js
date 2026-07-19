@@ -97,9 +97,9 @@ const report = window.eval(`(function(){
 ok("三站题目数据全部合法（含答案类型/思路/大招）", report.length === 0);
 if (report.length) report.forEach(e => console.log("    · " + e));
 
-console.log("— 古希腊/中华站可正常进入 —");
-window.eval("S.unlocked.greece=true; S.unlocked.china=true;");
-for (const civ of ["greece", "china"]) {
+console.log("— 其余四站可正常进入并跑课内 —");
+window.eval("S.unlocked.greece=true; S.unlocked.china=true; S.unlocked.maya=true; S.unlocked.rabbit=true;");
+for (const civ of ["greece", "china", "maya", "rabbit"]) {
   window.eval(`sess=null; nav=[]; S.view='station'; S.civ='${civ}'; render();`);
   ok(civ + " 站渲染出三层深度", window.document.querySelectorAll(".depth").length === 3);
   window.eval(`sess=null; S.view='core'; render();`);
