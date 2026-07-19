@@ -324,3 +324,64 @@ const STATIONS = {
   }
 
 };
+
+/* ============================================================
+ * 四册教材完整拓展（保留原有五站存档 id，新站顺序接在后面）
+ * 三上：测量/倍/分数/集合；三下：除法/位置/小数/统计
+ * 四上：大数/角/除法；四下：四则/小数/图形/平均数
+ * ============================================================ */
+CIVS.push(
+  { id:"babylon",icon:"🌙",name:"古巴比伦",place:"两河流域 · 六十进制",book:"三上",unit:"测量·倍·分数",wonder:{icon:"🧱",name:"泥板数学书"},blurb:"巴比伦人把数字刻在泥板上，用六十进制丈量时间，也很早就会计算分数。",locked:true },
+  { id:"india",icon:"🪷",name:"古印度",place:"恒河 · 零的故乡",book:"三下",unit:"除法·小数·统计",wonder:{icon:"0️⃣",name:"零号石碑"},blurb:"数字 0 和今天使用的数位写法从这里走向世界，复杂计算因此变得简单。",locked:true },
+  { id:"sail",icon:"🧭",name:"大航海时代",place:"海图 · 经纬与角度",book:"四上",unit:"大数·角·除法",wonder:{icon:"🧭",name:"星光罗盘"},blurb:"航海家要读懂大数、方向和角度，还要用除法安排补给。",locked:true },
+  { id:"modern",icon:"🔭",name:"现代科学城",place:"实验室 · 数据广场",book:"四下",unit:"四则·小数·统计",wonder:{icon:"📊",name:"数据望远镜"},blurb:"现代数学把运算、图形和数据连在一起，帮助我们看见规律、作出判断。",locked:true }
+);
+
+STATIONS.egypt.core.push(
+  {id:"eg_multi1",name:"多位数乘一位数",icon:"✖️",gen(){const a=R(102,899),b=R(2,9);return{q:`${a} × ${b} =`,a:a*b,hint:"从个位乘起，哪一位满几十就向前进几"};}},
+  {id:"eg_set",name:"集合与重叠",icon:"⭕",gen(){const a=R(8,18),b=R(7,16),both=R(2,Math.min(a,b)-1);return{q:`喜欢画画的有 ${a} 人，喜欢唱歌的有 ${b} 人，两样都喜欢的有 ${both} 人。至少喜欢一项的有多少人？`,a:a+b-both,hint:"两样都喜欢的人被数了两次，要减掉一次"};}}
+);
+STATIONS.greece.core.push(
+  {id:"gr_direction",name:"位置与方向",icon:"🧭",gen(){const east=R(2,8),north=R(2,8);return{q:`从起点向东走 ${east} 格，再向北走 ${north} 格，一共走了多少格？`,a:east+north,hint:"路线长度要把两段相加"};}},
+  {id:"gr_stat",name:"复式统计",icon:"📊",gen(){const a=R(12,35),b=R(12,35),c=R(12,35);return{q:`三组阅读本数分别是 ${a}、${b}、${c} 本，总数是多少？`,a:a+b+c,hint:"先找最容易凑整的两个数"};}}
+);
+
+STATIONS.babylon={labels:{core:"三上《测量·倍的认识·分数初步》",extend:"六十进制 · 时间为什么一小时有60分",challenge:"单位、倍数与分数的生活推理"},core:[
+  {id:"ba_unit",name:"长度单位",icon:"📏",gen(){const m=R(2,9),cm=R(1,99);return{q:`${m} 米 ${cm} 厘米 = 多少厘米？`,a:m*100+cm,hint:"1米=100厘米"};}},
+  {id:"ba_mass",name:"质量单位",icon:"⚖️",gen(){const kg=R(2,8),g=R(1,9)*100;return{q:`${kg} 千克 ${g} 克 = 多少克？`,a:kg*1000+g,hint:"1千克=1000克"};}},
+  {id:"ba_times",name:"倍的认识",icon:"🔁",gen(){const a=R(3,9),b=R(2,8);return{q:`白白有 ${a} 颗星，小主人有白白的 ${b} 倍。小主人有多少颗星？`,a:a*b,hint:"求一个数的几倍，用乘法"};}},
+  {id:"ba_frac",name:"分数初步",icon:"🍰",gen(){const den=pick([4,5,8,10]),x=R(1,den-1),y=R(1,den-x);return{q:`同分母分数：${x}/${den} + ${y}/${den} = ?/${den}，填分子`,a:x+y,hint:"分母不变，分子相加"};}}
+],extend:{cards:[{icon:"⏳",title:"时间里的六十进制",body:"一小时有60分、一分有60秒，是古巴比伦六十进制留下的礼物。60能被2、3、4、5、6等许多数整除，分起来很方便。"},{icon:"🧱",title:"泥板上的分数",body:"古人用湿泥板记账和测量土地。分数并不是课本里的符号，它最早就是为公平分粮食、分土地而出现的。"}],tricks:[{icon:"🕰️",name:"跨整点算时间",card:"先走到下一个整点，再算剩下的时间，最后相加。",gen(){const m=pick([35,40,45,50]),later=R(20,70);return{q:`现在是 8:${m}，${later} 分钟后是几点几分？把时和分连写，如9:15填915`,a:(()=>{let t=8*60+m+later;return Math.floor(t/60)*100+t%60})(),hint:"先把时间都换成分钟，满60分进1小时"};}}],play:[]},challenge:[
+  {id:"ba_rope",icon:"🪢",name:"绳子分段",star:2,type:"fill",q:"一根24米的绳子，每3米剪一段，需要剪几次？",a:7,steps:["先算能分成24÷3=8段。","排成一排看，8段之间只有7个接口。"],big:"剪绳、锯木题要分清<b>段数和次数</b>：不接成环时，次数=段数−1。"},
+  {id:"ba_fracleft",icon:"🍰",name:"蛋糕还剩多少",star:2,type:"fill",q:"一块蛋糕，上午吃了3/8，下午吃了2/8，还剩几分之几？填分子。",a:3,steps:["一整块是8/8。","一共吃了3/8+2/8=5/8。","8/8−5/8=3/8。"],big:"同分母分数相加减，<b>分母不变，只算分子</b>。"}
+]};
+
+STATIONS.india={labels:{core:"三下《除数是一位数·小数初步·统计》",extend:"零与数位 · 印度数字怎样改变世界",challenge:"余数、小数与数据推理"},core:[
+  {id:"in_div",name:"一位数除法",icon:"➗",gen(){const b=R(2,9),a=b*R(12,99);return{q:`${a} ÷ ${b} =`,a:a/b,hint:"从最高位除起，每一步余数要比除数小"};}},
+  {id:"in_rem",name:"有余数除法",icon:"🧺",gen(){const b=R(3,9),q=R(8,30),r=R(1,b-1);return{q:`${b*q+r} ÷ ${b}，余数是多少？`,a:r,hint:"被除数=商×除数+余数"};}},
+  {id:"in_decimal",name:"小数加减",icon:"🔸",gen(){const a=R(11,99),b=R(11,99);return{q:`${(a/10).toFixed(1)} + ${(b/10).toFixed(1)} =`,a:(a+b)/10,hint:"小数点对齐再相加"};}},
+  {id:"in_avglook",name:"数据比较",icon:"📊",gen(){const xs=[R(10,40),R(10,40),R(10,40),R(10,40)];return{q:`四天读书页数是 ${xs.join("、")}，最多的一天比最少的一天多多少页？`,a:Math.max(...xs)-Math.min(...xs),hint:"先找最大数和最小数"};}}
+],extend:{cards:[{icon:"0️⃣",title:"零为什么重要",body:"没有0时，十、百、千的空位很难表达。0既表示“什么也没有”，又能替数位占座，是一种了不起的发明。"},{icon:"🔢",title:"数字的旅行",body:"今天的0到9常被叫作阿拉伯数字，其实最早形成于印度，经阿拉伯学者传播到欧洲，再走遍世界。"}],tricks:[{icon:"🧮",name:"除法验算",card:"商×除数+余数=被除数，而且余数一定小于除数。",gen(){const b=R(3,9),q=R(12,40),r=R(0,b-1);return{q:`某数除以 ${b}，商 ${q} 余 ${r}，这个数是多少？`,a:b*q+r,hint:"商×除数+余数"};}}],play:[]},challenge:[
+  {id:"in_boat",icon:"🛶",name:"至少几条船",star:2,type:"fill",q:"38人坐船，每条最多坐6人，至少需要几条船？",a:7,steps:["38÷6=6条……2人。","余下2人也需要一整条船。"],big:"解决实际问题时，余数代表没安排完的人，要根据情境<b>进一法</b>。"},
+  {id:"in_price",icon:"🪙",name:"谁更便宜",star:2,type:"fill",q:"一本本子3.8元，一支笔2.6元，付10元应找回多少元？",a:3.6,steps:["先算一共花3.8+2.6=6.4元。","再算10−6.4=3.6元。"],big:"小数解决钱数问题时，小数点必须对齐，相同数位才能相加减。"}
+]};
+
+STATIONS.sail={labels:{core:"四上《大数认识·角·除数两位数》",extend:"海图、经纬线与估算",challenge:"方向、角度和安排问题"},core:[
+  {id:"sa_place",name:"大数数位",icon:"🔢",gen(){const n=R(1000,9999)*10000;return{q:`${n} 里面有多少个万？`,a:n/10000,hint:"从右往左四位一级，万位是新一级"};}},
+  {id:"sa_round",name:"四舍五入",icon:"≈",gen(){const n=R(10000,99999);return{q:`${n} 省略万位后面的尾数约是多少万？`,a:Math.round(n/10000),hint:"看千位，满5向万位进1"};}},
+  {id:"sa_angle",name:"角的计算",icon:"📐",gen(){const a=pick([30,45,60,75,120,135]);return{q:`一个平角是180°，其中一个角是 ${a}°，另一个角是多少度？`,a:180-a,hint:"平角=180°"};}},
+  {id:"sa_div2",name:"除数两位数",icon:"➗",gen(){const b=R(12,49),q=R(11,80);return{q:`${b*q} ÷ ${b} =`,a:q,hint:"先把除数看成接近的整十数试商"};}}
+],extend:{cards:[{icon:"🧭",title:"罗盘上的角",body:"正北到正东是90°，相反方向是180°，转一整圈是360°。角度让方向能够准确交流。"},{icon:"🌍",title:"经纬线",body:"经线和纬线像包住地球的网格。只要给出经度和纬度，就能描述地球上的位置。"}],tricks:[{icon:"⚓",name:"试商调商",card:"除数接近整十时先用整十试商；商大了减1，商小了加1。",gen(){const b=pick([19,21,29,31,39,41]),q=R(4,9);return{q:`${b*q} ÷ ${b} =`,a:q,hint:`把${b}看成${Math.round(b/10)*10}试商`};}}],play:[]},challenge:[
+  {id:"sa_turn",icon:"🧭",name:"航向转弯",star:2,type:"fill",q:"船头朝北，顺时针转135°，再逆时针转45°，最后与正北夹角多少度？",a:90,steps:["顺时针先转135°。","逆时针退回45°。","135−45=90°。"],big:"方向旋转可以在数轴或圆上表示：顺时针加，逆时针减。"},
+  {id:"sa_boxes",icon:"📦",name:"装箱问题",star:2,type:"fill",q:"425个零件，每箱装24个，装满后还剩多少个？",a:17,steps:["找最接近425的24的倍数。","24×17=408。","425−408=17。"],big:"有余数除法可以用<b>商×除数+余数</b>反向验算。"}
+]};
+
+STATIONS.modern={labels:{core:"四下《四则运算·小数·图形运动·平均数》",extend:"数据、坐标与算法",challenge:"综合应用与逻辑推理"},core:[
+  {id:"mo_mix",name:"四则混合",icon:"🧮",gen(){const a=R(12,40),b=R(3,9),c=R(2,8);return{q:`${a} + ${b} × ${c} =`,a:a+b*c,hint:"先乘除，后加减"};}},
+  {id:"mo_decimal",name:"小数意义",icon:"🔸",gen(){const a=R(101,999),b=R(11,99);return{q:`${(a/100).toFixed(2)} − ${(b/100).toFixed(2)} =`,a:(a-b)/100,hint:"小数点对齐，末尾可以添0"};}},
+  {id:"mo_triangle",name:"三角形内角",icon:"🔺",gen(){const a=R(30,80),b=R(30,80);return{q:`三角形两个角是 ${a}°、${b}°，第三个角是多少度？`,a:180-a-b,hint:"三角形内角和=180°"};}},
+  {id:"mo_average",name:"平均数",icon:"📊",gen(){const avg=R(12,40),a=avg-R(1,6),b=avg+R(1,6),c=avg*3-a-b;return{q:`三次成绩是 ${a}、${b}、${c}，平均数是多少？`,a:avg,hint:"总数÷份数=平均数"};}}
+],extend:{cards:[{icon:"🤖",title:"算法是什么",body:"算法就是一组明确的步骤。竖式、找平均数、导航路线都是算法；写程序只是把算法交给计算机执行。"},{icon:"📊",title:"平均数会隐藏什么",body:"平均数能概括整体，却不能告诉你每一个数据。看数据时还要留意最大值、最小值和变化趋势。"}],tricks:[{icon:"⚖️",name:"移多补少",card:"求平均数可以先找一个中间数，把多的移给少的，直到每份一样多。",gen(){const avg=R(15,40),d=R(2,8);return{q:`${avg-d}、${avg}、${avg+d} 的平均数是多少？`,a:avg,hint:"左右两个数正好围绕中间数对称"};}}],play:[]},challenge:[
+  {id:"mo_chicken",icon:"🐔",name:"鸡兔同笼",star:3,type:"fill",q:"笼中鸡兔共8只，共有22只脚。兔有几只？",a:3,steps:["假设全是鸡，共有8×2=16只脚。","实际多22−16=6只脚。","每把一只鸡换成兔多2只脚，所以兔有6÷2=3只。"],big:"鸡兔同笼可以用<b>假设法</b>：先假设全是一种，再看差额。"},
+  {id:"mo_avg",icon:"📈",name:"平均数补齐",star:2,type:"fill",q:"四次数学小游戏平均得分是85分，前三次是80、88、84，第四次是多少？",a:88,steps:["四次总分=85×4=340。","前三次总分=80+88+84=252。","第四次=340−252=88。"],big:"知道平均数先求总数：<b>平均数×份数=总数</b>。"}
+]};

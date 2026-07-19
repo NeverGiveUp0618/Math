@@ -23,6 +23,10 @@ function defState() {
     readCards: {},          // 拓展知识卡 已读
     daily: { date: todayStr(), correct: 0 },
     history: {},            // 日期 -> {right}  家长后台默默记录，不做打卡压力
+    attempts: {},           // skillId -> {right,total,streak,lastWrong}
+    timeLog: {},            // date -> {map,core,extend,challenge,exam} 秒数
+    exams: {},              // book -> [{date,right,total}]
+    scratchDrafts: {},      // 当前题草稿图片
     totalRight: 0,          // 累计做对题数（成就）
     testMode: false
   };
@@ -30,6 +34,7 @@ function defState() {
 let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
 S.daily = Object.assign({ date: todayStr(), correct: 0 }, S.daily);
+S.attempts = S.attempts || {}; S.timeLog = S.timeLog || {}; S.exams = S.exams || {}; S.scratchDrafts = S.scratchDrafts || {};
 if (S.daily.date !== todayStr()) S.daily = { date: todayStr(), correct: 0 };
 
 function walletOut() { try { localStorage.setItem(WALLET_KEY, JSON.stringify({ coins: S.coins || 0, tickets: S.tickets || 0 })); } catch (e) {} }
@@ -65,6 +70,16 @@ function markCorrect() {
   S.history[t] = S.history[t] || { right: 0 };
   S.history[t].right++;
   save();
+}
+function markAttempt(id, ok) {
+  if (!id) return;
+  const a = S.attempts[id] || { right:0,total:0,streak:0,lastWrong:"" };
+  a.total++; if (ok) { a.right++; a.streak++; } else { a.streak=0; a.lastWrong=todayStr(); }
+  S.attempts[id]=a; save();
+}
+function weakSkills(civ) {
+  const skills=(civ?ST(civ).core:Object.values(STATIONS).flatMap(s=>s.core));
+  return skills.filter(x=>{const a=S.attempts[x.id];return a&&a.total>=2&&a.right/a.total<.75;}).sort((a,b)=>(S.attempts[a.id].right/S.attempts[a.id].total)-(S.attempts[b.id].right/S.attempts[b.id].total));
 }
 
 /* ---------- SRS ---------- */
@@ -107,38 +122,51 @@ function paintPurse() {
 let toastTimer;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2200); }
 
+function loadSharedPet(){try{return JSON.parse(localStorage.getItem("sharedPet_v1")||"null")||{}}catch(e){return{}}}
+function petBody(){const b=String(loadSharedPet().body||"");return /^https:\/\/nevergiveup0618\.github\.io\/English\/assets\/(?:baibai-base\.png|poses\/pose-\d{2}\.webp)$/.test(b)?b:"assets/baibai-base.png";}
+function safeNum(v,d,min,max){v=Number(v);return Number.isFinite(v)?Math.max(min,Math.min(max,v)):d;}
+function baibaiAvatar(cls){const p=loadSharedPet(),layers=(p.items||[]).slice(0,20).map(it=>{const art=String(it.art||""),safe=/^https:\/\/nevergiveup0618\.github\.io\/English\/assets\/outfits\/[a-z0-9-]+\.(?:svg|webp)$/.test(art),x=safeNum(it.x,50,0,100),y=safeNum(it.y,50,0,100),s=safeNum(it.s,1,.3,3),r=safeNum(it.r,0,-360,360),base=safeNum(it.base,.3,.2,1.2);return `<span class="pet-layer" style="left:${x}%;top:${y}%;width:${Math.round(base*s*100)}%;transform:translate(-50%,-50%) rotate(${r}deg)">${safe?`<img src="${art}" alt="">`:esc(it.e||"")}</span>`}).join("");return `<span class="math-baibai ${cls||""}"><img class="pet-body" src="${petBody()}" alt="白白">${layers}</span>`;}
+
+let activeModule="map", activeAt=Date.now();
+function trackTime(next){const now=Date.now(),sec=Math.min(120,Math.max(0,Math.round((now-activeAt)/1000))),d=S.timeLog[todayStr()]||(S.timeLog[todayStr()]={map:0,core:0,extend:0,challenge:0,exam:0});d[activeModule]=(d[activeModule]||0)+sec;activeModule=next||S.view;activeAt=now;if(sec)save();}
+
 function scratchPadHtml() {
-  return `<div class="scratch"><button class="scratch-toggle" type="button">✏️ 需要时打开草稿纸</button><div class="scratch-body hidden"><div class="scratch-tools"><button type="button" data-tool="pen" class="on">铅笔</button><button type="button" data-tool="eraser">橡皮</button><button type="button" data-tool="clear">清空</button></div><canvas width="600" height="380" aria-label="手写草稿区"></canvas></div></div>`;
+  return `<div class="scratch"><button class="scratch-toggle" type="button">✏️ 需要时打开草稿纸</button><div class="scratch-body hidden"><div class="scratch-tools"><button type="button" data-tool="pen" class="on">铅笔</button><button type="button" data-tool="eraser">橡皮</button><button type="button" data-tool="undo">撤销</button><button type="button" data-tool="clear">清空</button><button type="button" data-template="grid">方格</button><button type="button" data-template="vertical">竖式</button><button type="button" data-template="numberline">数轴</button></div><canvas class="grid" width="600" height="380" aria-label="手写草稿区"></canvas></div></div>`;
 }
+function scratchKey(){return `${S.view}:${S.civ||"all"}:${examSess?examSess.book+":"+examSess.i:sess?sess.mode+":"+sess.i:S.sub||0}`;}
 function bindScratchPad(root) {
   const box = root.querySelector(".scratch"); if (!box) return;
   const body = box.querySelector(".scratch-body"), canvas = box.querySelector("canvas");
   box.querySelector(".scratch-toggle").onclick = () => body.classList.toggle("hidden");
   if (/jsdom/i.test(navigator.userAgent || "")) return;
   const ctx = canvas.getContext("2d"); if (!ctx) return;
-  let drawing = false, eraser = false;
+  let drawing = false, eraser = false, undo=[]; const key=scratchKey();
+  const prior=S.scratchDrafts[key];if(prior){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0);img.src=prior;}
+  const remember=()=>{try{S.scratchDrafts[key]=canvas.toDataURL("image/webp",.72);localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){}};
   box.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => {
-    if (b.dataset.tool === "clear") { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+    if (b.dataset.tool === "clear") { undo.push(canvas.toDataURL());ctx.clearRect(0, 0, canvas.width, canvas.height);remember();return; }
+    if (b.dataset.tool === "undo") { const src=undo.pop();ctx.clearRect(0,0,canvas.width,canvas.height);if(src){const img=new Image();img.onload=()=>{ctx.drawImage(img,0,0);remember()};img.src=src}else remember();return; }
     eraser = b.dataset.tool === "eraser"; box.querySelectorAll("[data-tool]").forEach(x => x.classList.toggle("on", x === b));
   });
+  box.querySelectorAll("[data-template]").forEach(b=>b.onclick=()=>{canvas.className=b.dataset.template;});
   const point = e => { const r = canvas.getBoundingClientRect(), p = e.touches ? e.touches[0] : e; return [(p.clientX-r.left)*canvas.width/r.width,(p.clientY-r.top)*canvas.height/r.height]; };
-  const start = e => { drawing=true; const [x,y]=point(e); ctx.beginPath(); ctx.moveTo(x,y); e.preventDefault(); };
+  const start = e => { drawing=true;undo.push(canvas.toDataURL());if(undo.length>12)undo.shift();const [x,y]=point(e); ctx.beginPath(); ctx.moveTo(x,y); e.preventDefault(); };
   const move = e => { if(!drawing)return; const [x,y]=point(e); ctx.lineCap="round"; ctx.lineJoin="round"; ctx.lineWidth=eraser?28:4; ctx.strokeStyle=eraser?"#fff":"#655474"; ctx.lineTo(x,y); ctx.stroke(); e.preventDefault(); };
-  const stop = () => drawing=false;
+  const stop = () => {if(drawing){drawing=false;remember();}};
   canvas.addEventListener("pointerdown",start); canvas.addEventListener("pointermove",move); canvas.addEventListener("pointerup",stop); canvas.addEventListener("pointerleave",stop);
 }
 function baibaiTip(text) { return `<div class="baibai-tip"><img src="assets/baibai-base.png" alt="白白"><span>${text}</span></div>`; }
 
 let nav = []; // 面包屑视图栈，用于返回
-function go(view, opts) { nav.push({ view: S.view, civ: S.civ, sub: S.sub }); S.view = view; Object.assign(S, opts || {}); render(); }
-function back() { const p = nav.pop(); if (p) { S.view = p.view; S.civ = p.civ; S.sub = p.sub; } else S.view = "map"; render(); }
+function go(view, opts) { trackTime(view); nav.push({ view: S.view, civ: S.civ, sub: S.sub }); S.view = view; Object.assign(S, opts || {}); render(); }
+function back() { trackTime(); const p = nav.pop(); if (p) { S.view = p.view; S.civ = p.civ; S.sub = p.sub; } else S.view = "map"; activeModule=S.view; render(); }
 
 /* ============================================================ 渲染 ============================================================ */
 function render() {
   paintPurse();
   const scr = $("#screen");
-  $("#backBtn").classList.toggle("hidden", S.view === "map" || S.view === "rewards" || S.view === "parent");
-  $("#learningHome").classList.toggle("hidden", !(S.view === "map" || S.view === "rewards" || S.view === "parent"));
+  $("#backBtn").classList.toggle("hidden", ["map","review","exam","rewards","parent"].includes(S.view));
+  $("#learningHome").classList.toggle("hidden", !["map","review","exam","rewards","parent"].includes(S.view));
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.v === S.view));
   if (S.view === "map") return renderMap(scr);
   if (S.view === "station") return renderStation(scr);
@@ -146,6 +174,8 @@ function render() {
   if (S.view === "extend") return renderExtend(scr);
   if (S.view === "challenge") return renderChallengeList(scr);
   if (S.view === "challengeRun") return renderChallenge(scr);
+  if (S.view === "review") return renderReview(scr);
+  if (S.view === "exam") return renderExam(scr);
   if (S.view === "rewards") return renderRewards(scr);
   if (S.view === "parent") return renderParent(scr);
 }
@@ -169,10 +199,13 @@ function renderMap(scr) {
   }).join("");
   const wrow = CIVS.map(c => `<span class="w ${S.wonders[c.id] ? "got" : ""}" title="${esc(c.wonder.name)}">${c.wonder.icon}</span>`).join("");
   scr.className = "map";
-  scr.innerHTML = `<div class="map-hero"><h2>今天想解开哪个数学秘密？</h2><p>从课本出发，再多走一步。每一次尝试都算一次新发现。</p></div><div class="guide baibai"><img src="assets/baibai-base.png" alt="白白"><div class="bubble">${greet}</div></div>
+  const weak=weakSkills(),recommend=weak.length?`白白发现「${esc(weak[0].name)}」值得再试一次。不是退步，是大脑正在长新路。`:`今天没有必须完成的内容，挑一个好奇的地方就行。`;
+  scr.innerHTML = `<div class="map-hero"><h2>今天想解开哪个数学秘密？</h2><p>从课本出发，再多走一步。每一次尝试都算一次新发现。</p></div><div class="guide baibai">${baibaiAvatar()}<div class="bubble">${greet}</div></div>
+    <div class="recommend"><b>🐾 白白的小建议</b><span>${recommend}</span><button class="btn" id="examBtn">📝 阶段测验</button></div>
     <div class="wonderbar"><div class="t">🏺 数学奇观收藏（集齐一站的三颗星就能点亮）</div><div class="row">${wrow}</div></div>
     ${civs}`;
   scr.querySelectorAll(".civ[data-civ]").forEach(el => el.onclick = () => go("station", { civ: el.dataset.civ }));
+  $("#examBtn").onclick=()=>go("exam");
 }
 
 /* ---------- 站内三层 ---------- */
@@ -182,12 +215,12 @@ function renderStation(scr) {
   const station = ST();
   scr.className = "depths";
   if (!station) {  // 该文明内容还没铺好
-    scr.innerHTML = `<div class="guide baibai"><img src="assets/baibai-base.png" alt="白白"><div class="bubble">这座 <b>${c.name}</b> 文明还在铺路，很快就能来探险。</div></div>`;
+    scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble">这座 <b>${c.name}</b> 文明还在铺路，很快就能来探险。</div></div>`;
     return;
   }
   const st = stStars(S.civ), L = station.labels;
   scr.innerHTML = `
-    <div class="guide baibai"><img src="assets/baibai-base.png" alt="白白"><div class="bubble"><div class="hello">白白找到一条新线索</div>${esc(c.blurb)}</div></div>
+    <div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">白白找到一条新线索</div>${esc(c.blurb)}</div></div>
     <div class="depth" style="--c:#f2a5c4" data-d="core"><div class="ico">🌸</div>
       <div><div class="nm">课内夯实</div><div class="ds">${esc(L.core)}</div></div>${st.core ? '<span class="done">✓</span>' : ''}</div>
     <div class="depth" style="--c:#e6b98f" data-d="extend"><div class="ico">🚀</div>
@@ -214,7 +247,9 @@ function nextCore(scr) {
   // 优先出本站到期复习题，否则本站随机
   let skill;
   const due = srsDueList(sess.civ), pool = ST(sess.civ).core;
+  const weak=weakSkills(sess.civ);
   if (due.length) skill = due[Math.floor(Math.random() * due.length)];
+  else if(weak.length&&Math.random()<.55) skill=weak[Math.floor(Math.random()*Math.min(3,weak.length))];
   else skill = pool[Math.floor(Math.random() * pool.length)];
   const prob = skill.gen();
   sess.cur = { skill, prob, isDue: !!(S.srs[skill.id] && S.srs[skill.id].due <= todayStr()) };
@@ -236,6 +271,7 @@ function nextCore(scr) {
     if (v === "") return;
     const val = Number(v), ok = val === prob.a;
     sess.revealed = true;
+    markAttempt(skill.id,ok);
     srsGrade(skill.id, ok);
     const fb = $("#fb");
     if (ok) {
@@ -277,7 +313,7 @@ function renderExtend(scr) {
   const e = ST().extend;
   const cards = e.cards.map(c => `<div class="readcard"><div class="h">${c.icon} ${esc(c.title)}</div><div class="b">${c.body}</div></div>`).join("");
   const tricks = (e.tricks || []).map(t => `<div class="readcard"><div class="h">${t.icon} 速算魔法：${esc(t.name)}</div><div class="b">${t.card}</div></div>`).join("");
-  scr.innerHTML = `<div class="guide baibai"><img src="assets/baibai-base.png" alt="白白"><div class="bubble"><div class="hello">白白的课外发现</div>先随便读一张感兴趣的卡，再动手玩一玩。</div></div>
+  scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">白白的课外发现</div>先随便读一张感兴趣的卡，再动手玩一玩。</div></div>
     ${cards}${tricks}
     <button class="btn wide" id="play">🎮 玩一玩拓展练习</button>`;
   e.cards.forEach((c, i) => { S.readCards[S.civ + "_c" + i] = true; }); save();
@@ -330,7 +366,7 @@ function renderChallengeList(scr) {
     return `<div class="readcard" data-i="${i}" style="cursor:pointer"><div class="h">${c.icon} ${esc(c.name)} ${"⭐".repeat(c.star)}${done ? ' <span style="color:#3ec98a;margin-left:auto">已破解 ✓</span>' : ''}</div>
       <div class="b" style="opacity:.7">${done ? "点开再想一遍，或看看还有没有别的思路" : "点开挑战 —— 先自己想，实在想不出再一条条看提示"}</div></div>`;
   }).join("");
-  scr.innerHTML = `<div class="guide baibai"><img src="assets/baibai-base.png" alt="白白"><div class="bubble"><div class="hello">慢慢想也很厉害</div>这里不比速度。可以画一画、试一试，实在想不出再看提示。</div></div>${list}`;
+  scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">慢慢想也很厉害</div>这里不比速度。可以画一画、试一试，实在想不出再看提示。</div></div>${list}`;
   scr.querySelectorAll(".readcard[data-i]").forEach(el => el.onclick = () => go("challengeRun", { sub: Number(el.dataset.i) }));
 }
 function renderChallenge(scr) {
@@ -384,12 +420,47 @@ function renderChallenge(scr) {
   $("#doneb").onclick = () => back();
 }
 
+/* ---------- 🧩 智能复习：首页级入口，只推荐真正需要回看的内容 ---------- */
+function findSkillStation(skill){return CIVS.find(c=>(STATIONS[c.id]?.core||[]).some(x=>x.id===skill.id));}
+function renderReview(scr){
+  $("#title").textContent="智能复习";scr.className="stage";nav=[];
+  const due=srsDueAll(),weak=weakSkills(),list=[...new Map(due.concat(weak).map(x=>[x.id,x])).values()].slice(0,12);
+  scr.innerHTML=`<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">只复习真正需要的</div>已经熟练的题会少出现；做错的知识点会换一种数字再回来。没有倒计时，也不扣金币。</div></div>
+    ${list.length?`<div class="panel"><h3>今天适合再看一眼</h3>${list.map(s=>{const c=findSkillStation(s),a=S.attempts[s.id]||{};return `<button class="review-row" data-skill="${s.id}" data-civ="${c.id}"><span>${s.icon}</span><b>${esc(s.name)}</b><small>${a.total?`已练${a.total}次 · 正确${a.right}次`:"到复习时间了"}</small><i>开始 ›</i></button>`}).join("")}</div>`:`<div class="qcard" style="text-align:center">${baibaiTip("目前没有到期错题。可以去地图随便探索，或者做一次阶段测验。")}</div>`}`;
+  scr.querySelectorAll(".review-row").forEach(b=>b.onclick=()=>{S.civ=b.dataset.civ;sess=null;go("core",{civ:b.dataset.civ})});
+}
+
+/* ---------- 📝 阶段测验：按教材册混合抽题，无倒计时 ---------- */
+let examSess=null;
+function bookSkills(book){return CIVS.filter(c=>c.book===book).flatMap(c=>(STATIONS[c.id]||{core:[]}).core);}
+function renderExam(scr){
+  $("#title").textContent="阶段测验"; scr.className="stage";
+  if(!examSess){
+    scr.innerHTML=`<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">看看哪些本领已经住进脑袋里</div>每次15题，不倒计时。做错只会生成复习建议，不扣金币。</div></div><div class="qcard"><div class="qmeta"><span>选择教材</span><span>15题</span></div><div class="exam-picks">${["三上","三下","四上","四下"].map(b=>`<button class="exam-pick" data-book="${b}">${b}<br><small>${bookSkills(b).length}个知识点</small></button>`).join("")}</div></div>`;
+    scr.querySelectorAll("[data-book]").forEach(b=>b.onclick=()=>{const pool=bookSkills(b.dataset.book);examSess={book:b.dataset.book,i:0,n:15,right:0,wrong:[],cur:null,pool};nextExam(scr);}); return;
+  }
+  nextExam(scr);
+}
+function nextExam(scr){
+  if(examSess.i>=examSess.n){
+    const e=examSess,weak=[...new Set(e.wrong.map(x=>x.name))];(S.exams[e.book]||(S.exams[e.book]=[])).push({date:todayStr(),right:e.right,total:e.n,weak:weak.slice(0,5)});save();
+    scr.innerHTML=`<div class="qcard" style="text-align:center">${baibaiTip(e.right>=12?"白白看见你认真检查的样子啦！":"错题已经收进复习路线，下次会换个样子再见。")}
+      <div class="qtext">${e.book}阶段测验完成</div><div class="exam-summary"><div><b>${e.right}</b><small>答对</small></div><div><b>${e.n-e.right}</b><small>待复习</small></div><div><b>${Math.round(e.right/e.n*100)}%</b><small>本次正确率</small></div></div>
+      <div class="note">${weak.length?`建议再看看：${weak.map(esc).join("、")}`:"这一轮全部掌握，可以去思维挑战逛逛。"}</div><button class="btn wide" id="againExam">再测一轮</button><button class="btn ghost wide" id="examBack">返回地图</button></div>`;
+    examSess=null; $("#againExam").onclick=()=>renderExam(scr); $("#examBack").onclick=()=>{nav=[];S.view="map";render();}; return;
+  }
+  const skill=examSess.pool[(examSess.i*3+Math.floor(Math.random()*examSess.pool.length))%examSess.pool.length],prob=skill.gen();examSess.cur={skill,prob};
+  scr.innerHTML=`<div class="progress"><i style="width:${examSess.i/examSess.n*100}%"></i></div><div class="qcard"><div class="qmeta"><span>${examSess.book} · ${skill.icon} ${esc(skill.name)}</span><span>${examSess.i+1}/${examSess.n}</span></div><div class="qtext">${prob.q}</div><div class="answerbox"><input id="ans" type="number" inputmode="decimal" placeholder="点这里填写答案" autocomplete="off"><button class="btn" id="ok">确定</button></div>${scratchPadHtml()}<div class="feedback" id="fb"></div></div><button class="btn ghost wide hidden" id="nextb">下一题 ›</button>`;
+  bindScratchPad(scr); const input=$("#ans"); const submit=()=>{const v=input.value.trim();if(!v)return;const ok=Number(v)===prob.a;markAttempt(skill.id,ok);if(ok){examSess.right++;markCorrect();}else examSess.wrong.push(skill);const fb=$("#fb");fb.className=`feedback ${ok?"ok":"no"} show`;fb.innerHTML=ok?"答对了，继续探索！":"正确答案是 <b>"+prob.a+"</b>。"+(prob.hint?"<br>"+prob.hint:"");input.disabled=true;$("#ok").classList.add("hidden");$("#nextb").classList.remove("hidden");};
+  $("#ok").onclick=submit;input.onkeydown=e=>{if(e.key==="Enter")submit()};$("#nextb").onclick=()=>{examSess.i++;nextExam(scr)};
+}
+
 /* ---------- 🎁 宝库（奖励页） ---------- */
 function renderRewards(scr) {
   $("#title").textContent = "宝库";
   nav = [];
   const gotW = Object.keys(S.wonders).length, gotStar = CIVS.reduce((n, c) => { const s = stStars(c.id); return n + (s.core ? 1 : 0) + (s.extend ? 1 : 0) + (s.challenge ? 1 : 0); }, 0);
-  const wonders = CIVS.map(c => `<div class="w ${S.wonders[c.id] ? "got" : ""}">${S.wonders[c.id] ? c.wonder.icon : "❔"}<span class="cap">${S.wonders[c.id] ? esc(c.wonder.name) : "未解锁"}</span></div>`).join("");
+  const wonders = CIVS.map(c => `<div class="w ${S.wonders[c.id] ? "got" : ""}">${c.wonder.icon}<span class="cap">${S.wonders[c.id] ? esc(c.wonder.name) : `待发现 · ${esc(c.wonder.name)}`}</span></div>`).join("");
   scr.className = "rewards";
   scr.innerHTML = `
     <div class="panel"><h3>🏺 数学奇观收藏</h3><div class="wondergrid">${wonders}</div>
@@ -404,11 +475,11 @@ function renderRewards(scr) {
 /* ---------- 👨‍👩‍👧 家长 ---------- */
 let pinOK = false;
 function renderParent(scr) {
-  $("#title").textContent = "统一家长中心";
+  $("#title").textContent = "数学家长设置";
   nav = [];
   scr.className = "parent";
   if (!pinOK) {
-    scr.innerHTML = `<div class="panel"><div class="parent-head"><img src="assets/baibai-base.png" alt="白白"><div><h3>统一家长中心</h3><p class="note">一个入口查看三科学习概况。请输入家长密码。</p></div></div>
+    scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学家长设置</h3><p class="note">三科总览请从学习导航进入；这里保留数学详细数据和设置。</p></div></div>
       <div class="pinpad"><input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••"></div>
       <button class="btn wide" id="go">进入</button></div>`;
     const go2 = () => { if ($("#pin").value === PARENT_PIN) { pinOK = true; renderParent(scr); } else toast("密码不对"); };
@@ -420,20 +491,24 @@ function renderParent(scr) {
     .map(d => `<div class="setrow"><span>${d.slice(5)}</span><b>做对 ${S.history[d].right} 题</b></div>`).join("") || `<div class="note">还没有学习记录。</div>`;
   const allCore = Object.values(STATIONS).flatMap(s => s.core);
   const mastered = allCore.filter(s => (S.srs[s.id] || {}).lv >= 4).length;
-  let en = {}, zh = {};
-  try { en = JSON.parse(localStorage.getItem("magicEnglish_v1") || "{}"); } catch(e) {}
-  try { zh = JSON.parse(localStorage.getItem("treasureWriting_v1") || "{}"); } catch(e) {}
-  const enLearned = Object.keys(en.srs || {}).length;
-  const zhWorks = (zh.works || zh.essays || zh.records || []).length || Object.keys(zh.history || {}).length;
-  scr.innerHTML = `<div class="panel"><div class="parent-head"><img src="assets/baibai-base.png" alt="白白"><div><h3>三科学习总览</h3><p class="note">先看全貌，需要细节时再进入各学科。</p></div></div>
-    <div class="subject-grid"><a class="subject-card" href="https://nevergiveup0618.github.io/English/"><span>🏰</span><b>英语</b><small>${enLearned} 个词已进入学习</small></a><a class="subject-card" href="https://nevergiveup0618.github.io/Chinese/"><span>🗺️</span><b>语文</b><small>${zhWorks} 条学习记录</small></a><a class="subject-card" href="#math-report"><span>🔭</span><b>数学</b><small>${S.totalRight || 0} 道做对</small></a></div></div>
+  const weak=weakSkills();
+  const fmtSec=n=>n<60?`${Math.round(n)}秒`:`${Math.floor(n/60)}分${Math.round(n%60)}秒`;
+  const keys=Array.from({length:7},(_,i)=>addDays(todayStr(),i-6));
+  const sumTime=(k,key)=>Number((S.timeLog[k]||{})[key]||0), weekKeys=["map","core","extend","challenge","exam"];
+  const todaySecs=weekKeys.reduce((a,k)=>a+sumTime(todayStr(),k),0),weekSecs=keys.reduce((a,d)=>a+weekKeys.reduce((n,k)=>n+sumTime(d,k),0),0);
+  const examRows=Object.entries(S.exams).flatMap(([book,rows])=>(rows||[]).map(x=>({book,...x}))).slice(-5).reverse();
+  scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学详细报告</h3><p class="note">三科总览、钱包和报告图片已集中到学习导航页。</p></div></div><a class="btn wide" href="https://nevergiveup0618.github.io/learning/">打开统一家长中心</a></div>
     <div class="panel" id="math-report"><h3>📊 数学学习概况（自动记录，无需打卡）</h3>
+    <div class="setrow"><span>今天有效学习</span><b>${fmtSec(todaySecs)}</b></div>
+    <div class="setrow"><span>最近7天有效学习</span><b>${fmtSec(weekSecs)}</b></div>
     <div class="setrow"><span>今天做对题数</span><b>${S.daily.correct}</b></div>
     <div class="setrow"><span>累计做对题目</span><b>${S.totalRight || 0}</b></div>
     <div class="setrow"><span>有学习记录的天数</span><b>${activeDays}</b></div>
     <div class="setrow"><span>已收集数学奇观</span><b>${Object.keys(S.wonders).length} / ${CIVS.length}</b></div>
     <div class="setrow"><span>课内知识点已熟练</span><b>${mastered} / ${allCore.length}</b></div>
     <div class="setrow"><span>待复习知识点(到期)</span><b>${srsDueAll().length}</b></div></div>
+    <div class="panel"><h3>🎯 当前需要关注</h3><div class="note">${weak.length?weak.slice(0,6).map(x=>esc(x.name)).join("、"):"暂时没有连续出错的知识点。"}</div></div>
+    <div class="panel"><h3>📝 最近阶段测验</h3>${examRows.length?examRows.map(x=>`<div class="setrow"><span>${x.date} · ${x.book}</span><b>${x.right}/${x.total}</b></div>`).join(""):"<div class='note'>还没有阶段测验记录。</div>"}</div>
     <div class="panel"><h3>🗓️ 最近学习记录</h3>${recent}
     <div class="note">孩子想学就学，这里只默默记录她每天做对了多少，供您了解进度——不设连续打卡，避免压力。</div></div>
     <div class="panel"><h3>⚙️ 设置</h3>
@@ -446,11 +521,12 @@ function renderParent(scr) {
 }
 
 /* ---------- 导航 ---------- */
-document.querySelectorAll("#nav button").forEach(b => b.onclick = () => { nav = []; sess = null; S.view = b.dataset.v; render(); });
+document.querySelectorAll("#nav button").forEach(b => b.onclick = () => { trackTime(b.dataset.v); nav = []; sess = null; examSess=null; S.view = b.dataset.v; render(); });
 $("#backBtn").onclick = () => { sess = null; back(); };
 document.addEventListener("visibilitychange", () => { if (!document.hidden) paintPurse(); });
 
 /* ---------- 启动 ---------- */
 walletIn();
+if(new URLSearchParams(location.search).get("parent")==="1")S.view="parent";
 render();
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));

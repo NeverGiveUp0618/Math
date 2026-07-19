@@ -29,6 +29,9 @@ ok("渲染出白白学习伙伴", $("#screen img[alt='白白']"));
 ok("首页文案无比较压力", !$("#screen").innerHTML.includes("脱颖而出"));
 ok("古埃及可点、其余上锁", $(".civ[data-civ='egypt']") && $(".civ.locked"));
 ok("奇观收藏栏存在", $(".wonderbar"));
+ok("底部菜单只保留探险/复习/测验/收藏", window.document.querySelectorAll("#nav button").length===4 && !$("#nav").textContent.includes("家长"));
+ok("四册教材扩展为9个文明站", window.eval("CIVS.length") === 9);
+ok("三上三下四上四下都有多个知识点", window.eval("['三上','三下','四上','四下'].every(b=>CIVS.filter(c=>c.book===b).flatMap(c=>STATIONS[c.id].core).length>=6)"));
 
 console.log("— 进入古埃及站 —");
 click($(".civ[data-civ='egypt']"));
@@ -39,6 +42,7 @@ console.log("— 课内夯实：跑满一轮全答对 —");
 click(window.document.querySelector(".depth[data-d='core']"));
 ok("计算题带内置草稿区", $(".scratch canvas"));
 ok("答题框不会自动获得焦点", window.document.activeElement !== $("#ans"));
+ok("草稿区有撤销、方格、竖式和数轴", $("[data-tool='undo']") && $("[data-template='grid']") && $("[data-template='vertical']") && $("[data-template='numberline']"));
 const coinStart = window.eval("S.coins");
 let guard = 0;
 while ($("#ans") && guard++ < 30) {
@@ -80,6 +84,15 @@ click($("#ok"));
 ok("答对显示解题大招", !$("#big").classList.contains("hidden"));
 ok("挑战奖励金币入账", window.eval("S.challengeDone.eg_gauss === true"));
 
+console.log("— 阶段测验与个性化 —");
+window.eval("examSess=null; nav=[]; S.view='exam'; render();");
+ok("阶段测验提供四册选择且明确不倒计时", window.document.querySelectorAll("[data-book]").length===4 && $("#screen").textContent.includes("不倒计时"));
+click($("[data-book='四上']"));
+ok("测验题带草稿且输入框不自动聚焦", $(".scratch") && window.document.activeElement !== $("#ans"));
+guard=0;while($("#ans")&&guard++<20){const a=window.eval("examSess.cur.prob.a");$("#ans").value=String(a);click($("#ok"));if($("#nextb")&&!$("#nextb").classList.contains("hidden"))click($("#nextb"));}
+ok("15题测验形成报告", $("#screen").textContent.includes("阶段测验完成") && window.eval("S.exams['四上'].length")===1);
+ok("答题统计可用于个性化", window.eval("Object.keys(S.attempts).length")>0);
+
 console.log("— 数据完整性：遍历全部站点题目 —");
 const report = window.eval(`(function(){
   const errs=[];
@@ -97,7 +110,7 @@ const report = window.eval(`(function(){
   }
   return errs;
 })()`);
-ok("三站题目数据全部合法（含答案类型/思路/大招）", report.length === 0);
+ok("九站题目数据全部合法（含答案类型/思路/大招）", report.length === 0);
 if (report.length) report.forEach(e => console.log("    · " + e));
 
 console.log("— 其余四站可正常进入并跑课内 —");
@@ -110,6 +123,9 @@ for (const civ of ["greece", "china", "maya", "rabbit"]) {
   while ($("#ans") && g++ < 12) { $("#ans").value = String(window.eval("sess.cur.prob.a")); click($("#ok")); ok(civ + " 课内答对判定", $("#fb").classList.contains("ok")); if ($("#nextb") && !$("#nextb").classList.contains("hidden")) click($("#nextb")); }
   ok(civ + " 课内一轮跑完", $("#screen").innerHTML.includes("这一轮做对"));
 }
+
+console.log("— 新增四站可进入 —");
+for (const civ of ["babylon","india","sail","modern"]) { window.eval(`S.unlocked.${civ}=true; sess=null; nav=[]; S.view='station'; S.civ='${civ}'; render();`); ok(civ+" 站有课内/拓展/思维三层",window.document.querySelectorAll(".depth").length===3); }
 
 console.log("— 三科共享钱包互通 —");
 window.localStorage.setItem("sharedWallet_v1", JSON.stringify({ coins: 999, tickets: 7 }));
@@ -127,6 +143,7 @@ console.log("— 宝库页 —");
 window.eval("nav=[]; S.view='rewards'; render();");
 ok("宝库无打卡日历", !$("#screen").innerHTML.includes("探险打卡") && !$("#screen").innerHTML.includes("cal"));
 ok("宝库展示奇观+成就", $("#screen").innerHTML.includes("数学奇观") && $("#screen").innerHTML.includes("探险成就"));
+ok("未获得奇观显示灰色原图而非问号", !$(".wondergrid").textContent.includes("❔") && $(".wondergrid .w:not(.got)"));
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);
