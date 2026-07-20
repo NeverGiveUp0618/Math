@@ -10,6 +10,7 @@ const addDays = (str, n) => { const d = new Date(str); d.setDate(d.getDate() + n
 const LS_KEY = "mathQuest_v1";
 const WALLET_KEY = "sharedWallet_v1";
 const CARD_DAILY_KEY = "sharedCardDaily_v1";
+const JOURNEY_KEY = "sharedLearningJourney_v1";
 const CARD_DAILY_LIMIT = 5;
 const SRS_STEPS = [1, 2, 4, 7, 15, 30]; // lv1..6 的复习间隔（天）
 
@@ -133,6 +134,9 @@ function safeNum(v,d,min,max){v=Number(v);return Number.isFinite(v)?Math.max(min
 function baibaiAvatar(cls){const p=loadSharedPet(),layers=(p.items||[]).slice(0,20).map(it=>{const art=String(it.art||""),safe=/^https:\/\/nevergiveup0618\.github\.io\/English\/assets\/outfits\/[a-z0-9-]+\.(?:svg|webp)$/.test(art),x=safeNum(it.x,50,0,100),y=safeNum(it.y,50,0,100),s=safeNum(it.s,1,.3,3),r=safeNum(it.r,0,-360,360),base=safeNum(it.base,.3,.2,1.2);return `<span class="pet-layer" style="left:${x}%;top:${y}%;width:${Math.round(base*s*100)}%;transform:translate(-50%,-50%) rotate(${r}deg)">${safe?`<img src="${art}" alt="">`:esc(it.e||"")}</span>`}).join("");return `<span class="math-baibai ${cls||""}"><img class="pet-body" src="${petBody()}" alt="白白">${layers}</span>`;}
 
 let activeModule="map", activeAt=Date.now();
+let journeyScreen="",journeyAt=Date.now();
+function flushJourney(){if(!journeyScreen)return;const seconds=Math.min(1800,Math.round((Date.now()-journeyAt)/1000));if(seconds<2)return;try{const rows=JSON.parse(localStorage.getItem(JOURNEY_KEY)||"[]");rows.push({subject:"ma",screen:journeyScreen,day:todayStr(),seconds,at:Date.now()});localStorage.setItem(JOURNEY_KEY,JSON.stringify(rows.slice(-500)));}catch(e){}journeyAt=Date.now();}
+function journeyView(id){if(id===journeyScreen)return;flushJourney();journeyScreen=id;journeyAt=Date.now();}
 function trackTime(next){const now=Date.now(),sec=Math.min(120,Math.max(0,Math.round((now-activeAt)/1000))),d=S.timeLog[todayStr()]||(S.timeLog[todayStr()]={map:0,core:0,extend:0,challenge:0,exam:0});d[activeModule]=(d[activeModule]||0)+sec;activeModule=next||S.view;activeAt=now;if(sec)save();}
 
 function scratchPadHtml() {
@@ -179,6 +183,7 @@ function back() { trackTime(); const p = nav.pop(); if (p) { S.view = p.view; S.
 
 /* ============================================================ 渲染 ============================================================ */
 function render() {
+  journeyView(S.view);
   paintPurse();
   const scr = $("#screen");
   $("#backBtn").classList.toggle("hidden", ["map","review","rewards"].includes(S.view));
@@ -550,7 +555,7 @@ function renderParent(scr) {
 /* ---------- 导航 ---------- */
 document.querySelectorAll("#nav button").forEach(b => b.onclick = () => { trackTime(b.dataset.v); nav = []; sess = null; examSess=null; S.view = b.dataset.v; render(); });
 $("#backBtn").onclick = () => { sess = null; back(); };
-document.addEventListener("visibilitychange", () => { if (!document.hidden) paintPurse(); });
+document.addEventListener("visibilitychange", () => { if(document.hidden)flushJourney();else{journeyAt=Date.now();paintPurse();} });
 
 /* ---------- 启动 ---------- */
 walletIn();
