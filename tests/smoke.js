@@ -35,6 +35,12 @@ ok("三至六年级八册都至少覆盖8个知识点", window.eval("['三上','
 ok("每个年级册至少有4道思维挑战", window.eval("['三上','三下','四上','四下','五上','五下','六上','六下'].every(b=>CIVS.filter(c=>c.book===b).flatMap(c=>STATIONS[c.id].challenge).length>=4)"));
 window.eval("localStorage.removeItem(CARD_DAILY_KEY);Array.from({length:7},()=>grantMathCard())");
 ok("数学每日独立最多获得5张卡", window.eval("mathCardDaily().math===5&&mathCardDaily().pendingMath===5"));
+window.eval("localStorage.removeItem(SUBJECT_BALANCE_KEY);S.daily={date:todayStr(),correct:0};const w=JSON.parse(localStorage.getItem(WALLET_KEY)||'{}');w.coins=0;w.tickets=0;localStorage.setItem(WALLET_KEY,JSON.stringify(w));S.coins=0;S.tickets=0;for(let i=0;i<5;i++)markCorrect()");
+ok("数学每天首次做对5题额外奖20金币", window.eval("S.coins===20&&JSON.parse(localStorage.getItem(SUBJECT_BALANCE_KEY)).ma===true"));
+window.eval("markCorrect()");
+ok("数学继续做题不重复发首次奖励", window.eval("S.coins===20"));
+window.eval("localStorage.setItem(SUBJECT_BALANCE_KEY,JSON.stringify({date:todayStr(),en:true,cn:false,ma:false,two:false,three:false}));S.daily={date:todayStr(),correct:4};markCorrect()");
+ok("数学成为当天第二科时只发一次跨科转盘券", window.eval("S.tickets===1&&JSON.parse(localStorage.getItem(SUBJECT_BALANCE_KEY)).two===true"));
 
 console.log("— 进入古埃及站 —");
 click($(".civ[data-civ='egypt']"));

@@ -52,6 +52,9 @@ function walletIn() {
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} walletOut(); }
 function mathCardDaily(){let d=null;try{d=JSON.parse(localStorage.getItem(CARD_DAILY_KEY)||"null")}catch(e){}if(!d||d.date!==todayStr())d={date:todayStr(),english:0,chinese:0,math:0,pendingChinese:0,pendingMath:0};["english","chinese","math","pendingChinese","pendingMath"].forEach(k=>d[k]=Math.max(0,Number(d[k])||0));return d;}
 function grantMathCard(){const d=mathCardDaily();if(d.math>=CARD_DAILY_LIMIT)return false;d.math++;d.pendingMath++;try{localStorage.setItem(CARD_DAILY_KEY,JSON.stringify(d))}catch(e){}return true;}
+const SUBJECT_BALANCE_KEY="sharedSubjectBalance_v1";
+function markBalancedSubject(subject){let d=null;try{d=JSON.parse(localStorage.getItem(SUBJECT_BALANCE_KEY)||"null")}catch(e){}if(!d||d.date!==todayStr())d={date:todayStr(),en:false,cn:false,ma:false,two:false,three:false};const first=!d[subject];d[subject]=true;const count=[d.en,d.cn,d.ma].filter(Boolean).length,two=count>=2&&!d.two,three=count===3&&!d.three;if(two)d.two=true;if(three)d.three=true;try{localStorage.setItem(SUBJECT_BALANCE_KEY,JSON.stringify(d))}catch(e){}return{first,two,three,count}}
+function queueBalancedCard(){const d=mathCardDaily();d.pendingBalance=Math.max(0,Number(d.pendingBalance)||0)+1;try{localStorage.setItem(CARD_DAILY_KEY,JSON.stringify(d))}catch(e){}}
 
 /* ---------- 奖励 ---------- */
 function addCoins(n) {
@@ -76,6 +79,7 @@ function markCorrect() {
   S.history[t].right++;
   grantMathCard();
   save();
+  if(S.daily.correct===5){const r=markBalancedSubject("ma");if(r.first){addCoins(20);toast("🔭 今天首次做对5题，+20金币");if(r.two){addTickets(1);setTimeout(()=>toast("🎟️ 今天已探索两个学科，+1转盘券"),700)}if(r.three){queueBalancedCard();setTimeout(()=>toast("🌟 三科探索完成！限定白白卡已送往英语收藏册"),1400)}}}
 }
 function markAttempt(id, ok) {
   if (!id) return;
@@ -499,7 +503,7 @@ function renderRewards(scr) {
       <div style="font-size:15px;line-height:1.9">收集到的数学奇观：<b>${gotW}</b> / ${CIVS.length}<br>点亮的探险星：<b>${gotStar}</b><br>累计做对题目：<b>${S.totalRight || 0}</b> 道</div></div>
     <div class="panel"><h3>🪙 我的钱包（三科通用）</h3>
       <div style="font-size:15px;line-height:1.9">金币：<b>${S.coins || 0}</b> 🪙<br>转盘券：<b>${S.tickets || 0}</b> 🎡</div>
-      <div class="note">数学、语文、英语三个网站是<b>同一个钱包</b>。数学收集到奇观会奖转盘券，可以到「魔法英语乐园」的幸运大转盘上转实物奖励。</div></div>`;
+      <div class="note">数学、语文、英语三个网站是<b>同一个钱包</b>。数学每天首次做对 5 题额外得 20 金币；任意两科达标多 1 张转盘券，三科达标再得限定白白卡。</div></div>`;
 }
 
 /* ---------- 👨‍👩‍👧 家长 ---------- */
