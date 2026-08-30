@@ -116,7 +116,11 @@ const report = window.eval(`(function(){
   const errs=[];
   for(const [id,st] of Object.entries(STATIONS)){
     if(!st.labels||!st.core||!st.extend||!st.challenge) errs.push(id+" 结构缺字段");
-    st.core.forEach(sk=>{ for(let k=0;k<20;k++){ const p=sk.gen(); if(typeof p.a!=="number"||!isFinite(p.a)) errs.push(id+"/"+sk.id+" 答案非数字"); if(!p.q) errs.push(id+"/"+sk.id+" 缺题面"); } });
+    st.core.forEach(sk=>{ for(let k=0;k<20;k++){ const p=sk.gen(); if(typeof p.a!=="number"||!isFinite(p.a)) errs.push(id+"/"+sk.id+" 答案非数字"); if(!p.q) errs.push(id+"/"+sk.id+" 缺题面");
+      /* ⚠️ 判题是 Number(输入)===prob.a 的严格相等：3.14×3×3 在 JS 里是 28.259999999999998，
+         孩子写 28.26 会被判错、怎么算都对不上。2026-08-30 全站扫描抓到 6 个中招（圆/百分数那批），
+         已在 data.js 用 RD() 修掉；这条断言守着别再犯。 */
+      if(Math.round(p.a*100)/100 !== p.a) errs.push(id+"/"+sk.id+" 答案带浮点尾巴，孩子永远答不对："+p.a); } });
     (st.extend.tricks||[]).concat([]).forEach(t=>{ for(let k=0;k<10;k++){ const p=t.gen(); if(typeof p.a!=="number") errs.push(id+" trick "+t.name+" 答案非数字"); } });
     (st.extend.play||[]).forEach(fn=>{ for(let k=0;k<10;k++){ const p=fn(); if(typeof p.a!=="number") errs.push(id+" play 答案非数字"); } });
     st.challenge.forEach(c=>{
@@ -128,7 +132,7 @@ const report = window.eval(`(function(){
   }
   return errs;
 })()`);
-ok("九站题目数据全部合法（含答案类型/思路/大招）", report.length === 0);
+ok("全站题目数据合法（答案类型/浮点/思路/大招）", report.length === 0);
 if (report.length) report.forEach(e => console.log("    · " + e));
 
 console.log("— 其余四站可正常进入并跑课内 —");

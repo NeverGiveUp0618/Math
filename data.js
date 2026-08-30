@@ -21,17 +21,21 @@ const PARENT_PIN = "223826";                    // 家长密码，与语文/英�
 const R = (a, b) => a + Math.floor(Math.random() * (b - a + 1)); // 含两端
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const digit = (x, i) => Math.floor(x / Math.pow(10, i)) % 10;
+/* ⚠️ 判题是 Number(输入)===prob.a 的严格相等：3.14×3×3 在 JS 里是 28.259999999999998，
+   孩子写 28.26 会被判错，而且怎么算都对不上。凡是带 π、除法、百分数的答案一律过 RD。
+   （2026-08-30 全站扫描抓到 6 个技能中招，都是圆/百分数那批。）*/
+const RD = (x, n = 2) => Math.round(x * Math.pow(10, n)) / Math.pow(10, n);
 
 /* ============================================================
  * 一、穿越史地图：文明站点（每站绑定一册课内单元）
  * 已解锁 egypt；其余随收集奇观逐个解锁。已写内容：egypt/greece/china。
  * ============================================================ */
 const CIVS = [
-  { id: "egypt", icon: "🏜️", name: "古埃及", place: "尼罗河 · 金字塔", book: "三上", unit: "万以内的加减法", wonder: { icon: "🔺", name: "大金字塔" }, blurb: "四千多年前的埃及人，用象形符号记数、用绳子丈量土地，还留下了世界上最早的分数。", locked: false },
+  { id: "egypt", icon: "🏜️", name: "古埃及", place: "尼罗河 · 金字塔", book: "三上", unit: "万以内加减法 · 时分秒", wonder: { icon: "🔺", name: "大金字塔" }, blurb: "四千多年前的埃及人，用象形符号记数、用绳子丈量土地，还留下了世界上最早的分数。", locked: false },
   { id: "greece", icon: "🏛️", name: "古希腊", place: "雅典 · 几何之城", book: "三下", unit: "面积", wonder: { icon: "📐", name: "帕特农神庙" }, blurb: "毕达哥拉斯和欧几里得的故乡，几何学从这里诞生——古希腊人用图形丈量整个世界。", locked: true },
-  { id: "china", icon: "🐉", name: "中华", place: "长安 · 九章算术", book: "四上", unit: "三位数乘两位数", wonder: { icon: "🧮", name: "算筹与算盘" }, blurb: "《九章算术》和算盘里，藏着古代中国最厉害的乘法算法。", locked: true },
-  { id: "maya", icon: "🌋", name: "玛雅", place: "丛林 · 历法神庙", book: "三下", unit: "年、月、日", wonder: { icon: "📅", name: "玛雅历法石" }, blurb: "玛雅人的历法精确得惊人，还独立发明了「零」。", locked: true },
-  { id: "rabbit", icon: "🐰", name: "中世纪", place: "比萨 · 斐波那契", book: "四下", unit: "数与规律", wonder: { icon: "🌻", name: "黄金螺线" }, blurb: "一群会「繁殖」的兔子，藏着自然界最美的数列。", locked: true }
+  { id: "china", icon: "🐉", name: "中华", place: "长安 · 九章算术", book: "四上", unit: "乘法 · 平行四边形和梯形", wonder: { icon: "🧮", name: "算筹与算盘" }, blurb: "《九章算术》和算盘里，藏着古代中国最厉害的乘法算法。", locked: true },
+  { id: "maya", icon: "🌋", name: "玛雅", place: "丛林 · 历法神庙", book: "三下", unit: "年月日 · 搭配", wonder: { icon: "📅", name: "玛雅历法石" }, blurb: "玛雅人的历法精确得惊人，还独立发明了「零」。", locked: true },
+  { id: "rabbit", icon: "🐰", name: "中世纪", place: "比萨 · 斐波那契", book: "四下", unit: "运算定律 · 规律 · 轴对称", wonder: { icon: "🌻", name: "黄金螺线" }, blurb: "一群会「繁殖」的兔子，藏着自然界最美的数列。", locked: true }
 ];
 
 const STATIONS = {
@@ -41,7 +45,7 @@ const STATIONS = {
    * ======================================================== */
   egypt: {
     labels: {
-      core: "三上《万以内的加减法》· 把课本练到又快又准",
+      core: "三上《万以内的加减法 · 时分秒》· 把课本练到又快又准",
       extend: "古埃及数字 · 速算魔法 —— 课本上学不到的",
       challenge: "奥数思维 · 重「怎么想到的」，一题多解"
     },
@@ -174,7 +178,7 @@ const STATIONS = {
    * ======================================================== */
   china: {
     labels: {
-      core: "四上《三位数乘两位数》· 笔算、估算、积的变化规律",
+      core: "四上《三位数乘两位数 · 平行四边形和梯形》· 笔算、估算、图形的边",
       extend: "九章算术 · 铺地锦 · 头同尾合十速算",
       challenge: "乘法里的奥数：拆数巧算与积的规律"
     },
@@ -224,7 +228,7 @@ const STATIONS = {
    * ======================================================== */
   maya: {
     labels: {
-      core: "三下《年、月、日》· 平闰年、大小月、24时计时、经过时间",
+      core: "三下《年月日 · 搭配》· 平闰年、24时计时、经过时间、搭配种数",
       extend: "玛雅历法 · 独立发明「零」· 拳头记大小月",
       challenge: "时间里的奥数：周期、和差、公倍数"
     },
@@ -276,7 +280,7 @@ const STATIONS = {
    * ======================================================== */
   rabbit: {
     labels: {
-      core: "四下《运算定律 · 找规律》· 简便运算、数列规律",
+      core: "四下《运算定律 · 找规律 · 图形的运动》· 简便运算、数列规律、轴对称与平移",
       extend: "斐波那契的兔子 · 黄金比 · 自然界的螺线",
       challenge: "规律里的奥数：兔子、二级等差、握手"
     },
@@ -331,10 +335,10 @@ const STATIONS = {
  * 四上：大数/角/除法；四下：四则/小数/图形/平均数
  * ============================================================ */
 CIVS.push(
-  { id:"babylon",icon:"🌙",name:"古巴比伦",place:"两河流域 · 六十进制",book:"三上",unit:"测量·倍·分数",wonder:{icon:"🧱",name:"泥板数学书"},blurb:"巴比伦人把数字刻在泥板上，用六十进制丈量时间，也很早就会计算分数。",locked:true },
-  { id:"india",icon:"🪷",name:"古印度",place:"恒河 · 零的故乡",book:"三下",unit:"除法·小数·统计",wonder:{icon:"0️⃣",name:"零号石碑"},blurb:"数字 0 和今天使用的数位写法从这里走向世界，复杂计算因此变得简单。",locked:true },
-  { id:"sail",icon:"🧭",name:"大航海时代",place:"海图 · 经纬与角度",book:"四上",unit:"大数·角·除法",wonder:{icon:"🧭",name:"星光罗盘"},blurb:"航海家要读懂大数、方向和角度，还要用除法安排补给。",locked:true },
-  { id:"modern",icon:"🔭",name:"现代科学城",place:"实验室 · 数据广场",book:"四下",unit:"四则·小数·统计",wonder:{icon:"📊",name:"数据望远镜"},blurb:"现代数学把运算、图形和数据连在一起，帮助我们看见规律、作出判断。",locked:true }
+  { id:"babylon",icon:"🌙",name:"古巴比伦",place:"两河流域 · 六十进制",book:"三上",unit:"测量·倍·分数·周长",wonder:{icon:"🧱",name:"泥板数学书"},blurb:"巴比伦人把数字刻在泥板上，用六十进制丈量时间，也很早就会计算分数。",locked:true },
+  { id:"india",icon:"🪷",name:"古印度",place:"恒河 · 零的故乡",book:"三下",unit:"除法·乘法·小数·统计",wonder:{icon:"0️⃣",name:"零号石碑"},blurb:"数字 0 和今天使用的数位写法从这里走向世界，复杂计算因此变得简单。",locked:true },
+  { id:"sail",icon:"🧭",name:"大航海时代",place:"海图 · 经纬与角度",book:"四上",unit:"大数·角·除法·公顷·统计图",wonder:{icon:"🧭",name:"星光罗盘"},blurb:"航海家要读懂大数、方向和角度，还要用除法安排补给。",locked:true },
+  { id:"modern",icon:"🔭",name:"现代科学城",place:"实验室 · 数据广场",book:"四下",unit:"四则·小数·观察物体·统计",wonder:{icon:"📊",name:"数据望远镜"},blurb:"现代数学把运算、图形和数据连在一起，帮助我们看见规律、作出判断。",locked:true }
 );
 
 STATIONS.egypt.core.push(
@@ -346,7 +350,7 @@ STATIONS.greece.core.push(
   {id:"gr_stat",name:"复式统计",icon:"📊",gen(){const a=R(12,35),b=R(12,35),c=R(12,35);return{q:`三组阅读本数分别是 ${a}、${b}、${c} 本，总数是多少？`,a:a+b+c,hint:"先找最容易凑整的两个数"};}}
 );
 
-STATIONS.babylon={labels:{core:"三上《测量·倍的认识·分数初步》",extend:"六十进制 · 时间为什么一小时有60分",challenge:"单位、倍数与分数的生活推理"},core:[
+STATIONS.babylon={labels:{core:"三上《测量·倍的认识·分数初步·周长》",extend:"六十进制 · 时间为什么一小时有60分",challenge:"单位、倍数与分数的生活推理"},core:[
   {id:"ba_unit",name:"长度单位",icon:"📏",gen(){const m=R(2,9),cm=R(1,99);return{q:`${m} 米 ${cm} 厘米 = 多少厘米？`,a:m*100+cm,hint:"1米=100厘米"};}},
   {id:"ba_mass",name:"质量单位",icon:"⚖️",gen(){const kg=R(2,8),g=R(1,9)*100;return{q:`${kg} 千克 ${g} 克 = 多少克？`,a:kg*1000+g,hint:"1千克=1000克"};}},
   {id:"ba_times",name:"倍的认识",icon:"🔁",gen(){const a=R(3,9),b=R(2,8);return{q:`白白有 ${a} 颗星，小主人有白白的 ${b} 倍。小主人有多少颗星？`,a:a*b,hint:"求一个数的几倍，用乘法"};}},
@@ -356,7 +360,7 @@ STATIONS.babylon={labels:{core:"三上《测量·倍的认识·分数初步》",
   {id:"ba_fracleft",icon:"🍰",name:"蛋糕还剩多少",star:2,type:"fill",q:"一块蛋糕，上午吃了3/8，下午吃了2/8，还剩几分之几？填分子。",a:3,steps:["一整块是8/8。","一共吃了3/8+2/8=5/8。","8/8−5/8=3/8。"],big:"同分母分数相加减，<b>分母不变，只算分子</b>。"}
 ]};
 
-STATIONS.india={labels:{core:"三下《除数是一位数·小数初步·统计》",extend:"零与数位 · 印度数字怎样改变世界",challenge:"余数、小数与数据推理"},core:[
+STATIONS.india={labels:{core:"三下《除数是一位数·两位数乘两位数·小数初步·统计》",extend:"零与数位 · 印度数字怎样改变世界",challenge:"余数、小数与数据推理"},core:[
   {id:"in_div",name:"一位数除法",icon:"➗",gen(){const b=R(2,9),a=b*R(12,99);return{q:`${a} ÷ ${b} =`,a:a/b,hint:"从最高位除起，每一步余数要比除数小"};}},
   {id:"in_rem",name:"有余数除法",icon:"🧺",gen(){const b=R(3,9),q=R(8,30),r=R(1,b-1);return{q:`${b*q+r} ÷ ${b}，余数是多少？`,a:r,hint:"被除数=商×除数+余数"};}},
   {id:"in_decimal",name:"小数加减",icon:"🔸",gen(){const a=R(11,99),b=R(11,99);return{q:`${(a/10).toFixed(1)} + ${(b/10).toFixed(1)} =`,a:(a+b)/10,hint:"小数点对齐再相加"};}},
@@ -366,7 +370,7 @@ STATIONS.india={labels:{core:"三下《除数是一位数·小数初步·统计�
   {id:"in_price",icon:"🪙",name:"谁更便宜",star:2,type:"fill",q:"一本本子3.8元，一支笔2.6元，付10元应找回多少元？",a:3.6,steps:["先算一共花3.8+2.6=6.4元。","再算10−6.4=3.6元。"],big:"小数解决钱数问题时，小数点必须对齐，相同数位才能相加减。"}
 ]};
 
-STATIONS.sail={labels:{core:"四上《大数认识·角·除数两位数》",extend:"海图、经纬线与估算",challenge:"方向、角度和安排问题"},core:[
+STATIONS.sail={labels:{core:"四上《大数认识·角·除数两位数·公顷·条形统计图》",extend:"海图、经纬线与估算",challenge:"方向、角度和安排问题"},core:[
   {id:"sa_place",name:"大数数位",icon:"🔢",gen(){const n=R(1000,9999)*10000;return{q:`${n} 里面有多少个万？`,a:n/10000,hint:"从右往左四位一级，万位是新一级"};}},
   {id:"sa_round",name:"四舍五入",icon:"≈",gen(){const n=R(10000,99999);return{q:`${n} 省略万位后面的尾数约是多少万？`,a:Math.round(n/10000),hint:"看千位，满5向万位进1"};}},
   {id:"sa_angle",name:"角的计算",icon:"📐",gen(){const a=pick([30,45,60,75,120,135]);return{q:`一个平角是180°，其中一个角是 ${a}°，另一个角是多少度？`,a:180-a,hint:"平角=180°"};}},
@@ -376,7 +380,7 @@ STATIONS.sail={labels:{core:"四上《大数认识·角·除数两位数》",ext
   {id:"sa_boxes",icon:"📦",name:"装箱问题",star:2,type:"fill",q:"425个零件，每箱装24个，装满后还剩多少个？",a:17,steps:["找最接近425的24的倍数。","24×17=408。","425−408=17。"],big:"有余数除法可以用<b>商×除数+余数</b>反向验算。"}
 ]};
 
-STATIONS.modern={labels:{core:"四下《四则运算·小数·图形运动·平均数》",extend:"数据、坐标与算法",challenge:"综合应用与逻辑推理"},core:[
+STATIONS.modern={labels:{core:"四下《四则运算·小数加减·观察物体·平均数》",extend:"数据、坐标与算法",challenge:"综合应用与逻辑推理"},core:[
   {id:"mo_mix",name:"四则混合",icon:"🧮",gen(){const a=R(12,40),b=R(3,9),c=R(2,8);return{q:`${a} + ${b} × ${c} =`,a:a+b*c,hint:"先乘除，后加减"};}},
   {id:"mo_decimal",name:"小数意义",icon:"🔸",gen(){const a=R(101,999),b=R(11,99);return{q:`${(a/100).toFixed(2)} − ${(b/100).toFixed(2)} =`,a:(a-b)/100,hint:"小数点对齐，末尾可以添0"};}},
   {id:"mo_triangle",name:"三角形内角",icon:"🔺",gen(){const a=R(30,80),b=R(30,80);return{q:`三角形两个角是 ${a}°、${b}°，第三个角是多少度？`,a:180-a-b,hint:"三角形内角和=180°"};}},
@@ -417,8 +421,8 @@ STATIONS.ocean={labels:{core:"五下《因数倍数·分数运算·长方体体�
 STATIONS.space={labels:{core:"六上《分数乘除·比·圆·百分数》",extend:"轨道比例与圆周率",challenge:"百分数、圆和工程问题"},core:[
   {id:"sp_fracmul",name:"分数乘法",icon:"✖️",gen(){const a=R(1,5),b=R(2,8),n=R(2,9);return{q:`${a}/${b} × ${n}，结果的分子（约分前）是多少？`,a:a*n,hint:"分子乘整数，分母不变，再约分"};}},
   {id:"sp_ratio",name:"比的化简",icon:"⚖️",gen(){const g=R(2,9),a=R(2,7),b=R(2,7);return{q:`${a*g}:${b*g} 化成最简比后，前项是多少？`,a:a,hint:"前项和后项同时除以最大公因数"};}},
-  {id:"sp_circle",name:"圆的周长",icon:"⭕",gen(){const r=R(2,10);return{q:`圆的半径 ${r} 厘米，取π=3.14，周长是多少厘米？`,a:6.28*r,hint:"圆周长=2×π×半径"};}},
-  {id:"sp_percent",name:"百分数",icon:"%",gen(){const total=pick([20,25,40,50,100]),hit=R(1,total);return{q:`${total} 道题做对 ${hit} 道，正确率是多少%？`,a:hit/total*100,hint:"正确数÷总数×100%"};}}
+  {id:"sp_circle",name:"圆的周长",icon:"⭕",gen(){const r=R(2,10);return{q:`圆的半径 ${r} 厘米，取π=3.14，周长是多少厘米？`,a:RD(6.28*r),hint:"圆周长=2×π×半径"};}},
+  {id:"sp_percent",name:"百分数",icon:"%",gen(){const total=pick([20,25,40,50,100]),hit=R(1,total);return{q:`${total} 道题做对 ${hit} 道，正确率是多少%？`,a:RD(hit/total*100),hint:"正确数÷总数×100%"};}}
 ],extend:{cards:[{icon:"🪐",title:"轨道为什么接近圆",body:"圆的每一点到中心距离相等，旋转对称。天体在引力作用下形成椭圆轨道，圆是椭圆最特殊、最对称的情况。"},{icon:"π",title:"永远写不完的圆周率",body:"圆周长与直径的比始终是π。它是无限不循环小数，人们已经算出数万亿位。"}],tricks:[{icon:"%",name:"百分数互换",card:"50%=1/2，25%=1/4，75%=3/4，10%=1/10。熟悉这些常用关系能快速心算。",gen(){const p=pick([10,20,25,50,75]);const n=pick([40,80,100,120,200]);return{q:`${n} 的 ${p}% 是多少？`,a:n*p/100,hint:"把百分数化成小数或分数"};}}],play:[]},challenge:[
   {id:"sp_work",icon:"🛠️",name:"合作工程",star:3,type:"fill",q:"甲单独6天完成，乙单独3天完成。两人合作几天完成？",a:2,steps:["把总工程看作1。","甲每天做1/6，乙每天做1/3=2/6。","合作每天做3/6=1/2，所以2天完成。"],big:"工程问题把总量设为1，用工作效率相加。"},
   {id:"sp_ring",icon:"⭕",name:"跑道一圈",star:2,type:"fill",q:"圆形跑道直径100米，取π=3.14，跑一圈多少米？",a:314,steps:["圆周长=π×直径。","3.14×100=314。"],big:"题目给直径时直接用C=πd，给半径时用C=2πr。"}
@@ -427,7 +431,7 @@ STATIONS.space={labels:{core:"六上《分数乘除·比·圆·百分数》",ext
 STATIONS.future={labels:{core:"六下《负数·比例·圆柱圆锥·统计》",extend:"模型、缩放与数据判断",challenge:"比例建模和空间综合"},core:[
   {id:"fu_negative",name:"正负数",icon:"🌡️",gen(){const a=R(-12,5),b=R(1,10);return{q:`气温从 ${a}℃ 上升 ${b}℃，现在是多少℃？`,a:a+b,hint:"在数轴上向右移动"};}},
   {id:"fu_prop",name:"比例求未知数",icon:"⚖️",gen(){const x=R(2,12),a=R(2,8),b=R(2,8);return{q:`x:${a} = ${b}:${a}，x =`,a:b,hint:"两个比相等，对应项保持相同关系"};}},
-  {id:"fu_cylinder",name:"圆柱体积",icon:"🥫",gen(){const r=R(2,6),h=R(2,9);return{q:`圆柱底面半径 ${r}、高 ${h} 厘米，取π=3.14，体积是多少立方厘米？`,a:3.14*r*r*h,hint:"圆柱体积=底面积×高"};}},
+  {id:"fu_cylinder",name:"圆柱体积",icon:"🥫",gen(){const r=R(2,6),h=R(2,9);return{q:`圆柱底面半径 ${r}、高 ${h} 厘米，取π=3.14，体积是多少立方厘米？`,a:RD(3.14*r*r*h),hint:"圆柱体积=底面积×高"};}},
   {id:"fu_scale",name:"比例尺",icon:"🗺️",gen(){const scale=pick([100,200,500]),cm=R(2,9);return{q:`比例尺1:${scale}，图上 ${cm} 厘米代表实际多少厘米？`,a:cm*scale,hint:"实际距离=图上距离×比例尺后项"};}}
 ],extend:{cards:[{icon:"🏗️",title:"模型为什么有用",body:"建筑模型、地图和工程图都按比例缩小。形状保持不变，长度按同一个倍数变化。"},{icon:"📊",title:"统计图也会误导",body:"纵轴如果不从0开始，小差异会看起来特别大。读图时既看柱子，也要看刻度和数据来源。"}],tricks:[{icon:"⚖️",name:"正比例判断",card:"两个量的比值一定，它们成正比例；一个扩大几倍，另一个也扩大几倍。",gen(){const price=R(2,9),n=R(3,12);return{q:`单价固定为 ${price} 元，买 ${n} 件共多少元？`,a:price*n,hint:"总价÷数量=单价保持不变"};}}],play:[]},challenge:[
   {id:"fu_cone",icon:"🍦",name:"圆锥装水",star:3,type:"fill",q:"等底等高的圆柱能装12升水，圆锥能装多少升？",a:4,steps:["等底等高圆锥体积是圆柱的1/3。","12÷3=4升。"],big:"圆锥体积=1/3×底面积×高。"},
@@ -480,12 +484,123 @@ STATIONS.ocean.core.push(
 STATIONS.space.core.push(
   {id:"sp_fracdiv",name:"分数除法",icon:"➗",gen(){const a=R(2,6),b=R(a+1,9),k=R(2,6);return{q:`${a*k} ÷ ${a}/${b} =`,a:k*b,hint:"除以一个分数，等于乘它的倒数"};}},
   {id:"sp_direction",name:"位置与方向（二）",icon:"🧭",gen(){const east=R(3,12),north=R(3,12);return{q:`从基地向东走 ${east} 千米，再向北走 ${north} 千米，路线总长多少千米？`,a:east+north,hint:"路线总长是各段长度之和"};}},
-  {id:"sp_circle_area",name:"圆的面积",icon:"⭕",gen(){const r=R(2,9);return{q:`圆的半径 ${r} 厘米，取π=3.14，面积是多少平方厘米？`,a:3.14*r*r,hint:"圆面积=π×半径²"};}},
+  {id:"sp_circle_area",name:"圆的面积",icon:"⭕",gen(){const r=R(2,9);return{q:`圆的半径 ${r} 厘米，取π=3.14，面积是多少平方厘米？`,a:RD(3.14*r*r),hint:"圆面积=π×半径²"};}},
   {id:"sp_fan",name:"扇形统计图",icon:"📊",gen(){const total=pick([40,80,120,200]),pct=pick([20,25,50]);return{q:`总数是 ${total}，扇形图中某项占 ${pct}%，这一项有多少？`,a:total*pct/100,hint:"部分量=总量×百分比"};}}
 );
 STATIONS.future.core.push(
   {id:"fu_discount",name:"折扣",icon:"🏷️",gen(){const price=pick([80,120,160,200]),discount=pick([5,8,9]);return{q:`原价 ${price} 元，打${discount}折后是多少元？`,a:price*discount/10,hint:"几折就是原价的百分之几十"};}},
-  {id:"fu_cyl_surface",name:"圆柱表面积",icon:"🥫",gen(){const r=R(2,5),h=R(3,9);return{q:`圆柱半径 ${r}、高 ${h} 厘米，取π=3.14，表面积是多少平方厘米？`,a:2*3.14*r*r+2*3.14*r*h,hint:"表面积=两个底面积+侧面积"};}},
-  {id:"fu_cone_core",name:"圆锥体积",icon:"🍦",gen(){const r=pick([3,6]),h=pick([3,6,9]);return{q:`圆锥底面半径 ${r}、高 ${h} 厘米，取π=3.14，体积是多少立方厘米？`,a:3.14*r*r*h/3,hint:"圆锥体积=底面积×高÷3"};}},
+  {id:"fu_cyl_surface",name:"圆柱表面积",icon:"🥫",gen(){const r=R(2,5),h=R(3,9);return{q:`圆柱半径 ${r}、高 ${h} 厘米，取π=3.14，表面积是多少平方厘米？`,a:RD(2*3.14*r*r+2*3.14*r*h),hint:"表面积=两个底面积+侧面积"};}},
+  {id:"fu_cone_core",name:"圆锥体积",icon:"🍦",gen(){const r=pick([3,6]),h=pick([3,6,9]);return{q:`圆锥底面半径 ${r}、高 ${h} 厘米，取π=3.14，体积是多少立方厘米？`,a:RD(3.14*r*r*h/3),hint:"圆锥体积=底面积×高÷3"};}},
   {id:"fu_inverse",name:"反比例",icon:"🔄",gen(){const people=R(3,8),days=R(4,10),more=people*2;return{q:`${people} 人完成一项任务要 ${days} 天，效率相同，${more} 人需要多少天？`,a:days/2,hint:"总工作量一定，人数扩大2倍，天数缩小到一半"};}}
+);
+
+/* ========================================================
+ * 📚 铺满四册 · 第一批：三上 / 三下 的课本缺口单元（2026-08-30）
+ * 对照人教版目录逐单元核过，缺哪个补哪个；id 前缀沿用各站原前缀。
+ * ======================================================== */
+
+/* 三上① 时分秒（第1单元） */
+STATIONS.egypt.core.push(
+  {id:"eg_time",name:"时分秒换算",icon:"⏱️",gen(){const m=R(2,9),s=R(1,59);return{q:`${m} 分 ${s} 秒 = 多少秒？`,a:m*60+s,hint:"1分=60秒，先把分换成秒再加上零头"};}},
+  {id:"eg_span",name:"经过了多少分钟",icon:"🕘",gen(){const h=R(7,10),m1=pick([10,20,25,40,45,50]),len=pick([15,20,25,30,35,40,45]);const t=m1+len;const h2=h+Math.floor(t/60),m2=t%60;return{q:`一节活动课从 ${h}:${String(m1).padStart(2,"0")} 开始，到 ${h2}:${String(m2).padStart(2,"0")} 结束，经过了多少分钟？`,a:len,hint:"先走到整点，再算剩下的，最后相加"};}}
+);
+
+/* 三上② 长方形和正方形 · 周长（第7单元） */
+STATIONS.babylon.core.push(
+  {id:"ba_peri",name:"正方形周长",icon:"🟦",gen(){const a=R(3,25);return{q:`一个正方形的边长是 ${a} 厘米，周长是多少厘米？`,a:a*4,hint:"正方形四条边一样长，周长=边长×4"};}},
+  {id:"ba_periback",name:"由周长求边",icon:"📐",gen(){const l=R(4,20),w=R(2,l-1);return{q:`一个长方形的周长是 ${(l+w)*2} 厘米，长是 ${l} 厘米，宽是多少厘米？`,a:w,hint:"周长÷2＝长+宽，再减去长"};}}
+);
+
+/* 三下① 两位数乘两位数（第4单元） */
+STATIONS.india.core.push(
+  {id:"in_ten",name:"整十数口算",icon:"🔟",gen(){const a=R(2,9),b=R(2,9);return{q:`${a*10} × ${b*10} =`,a:a*b*100,hint:"先算 " + a + "×" + b + "，再在后面添两个 0"};}},
+  {id:"in_mul2",name:"两位数乘两位数",icon:"✖️",gen(){const a=R(12,49),b=R(12,49);return{q:`${a} × ${b} =`,a:a*b,trap:{val:a*(b%10)+a*Math.floor(b/10),why:"第二步是乘十位上的数，得数末位要对齐十位（相当于再×10），别当成个位算"}};}}
+);
+
+/* 三下② 数学广角 · 搭配（第8单元）—— 玛雅历法本身就是一部搭配 */
+STATIONS.maya.core.push(
+  {id:"my_combo",name:"搭配的种数",icon:"🔀",gen(){const a=R(3,13),b=R(2,9);return{q:`玛雅历法里有 ${a} 个日名和 ${b} 个数字，一个日名配一个数字，能组成多少种不同的日子？`,a:a*b,hint:"每个日名都能配上全部数字，用乘法"};}}
+);
+
+STATIONS.egypt.challenge.push(
+  {id:"eg_bell",icon:"🔔",name:"神庙敲钟",star:3,type:"fill",
+   q:"神庙的钟敲 6 下用了 10 秒（每两下之间间隔一样长）。那么敲 11 下要用多少秒？",a:20,
+   steps:["别用 10÷6。敲 6 下，中间只有 <b>5</b> 个间隔。","10÷5＝2 秒，这是<b>一个间隔</b>的时间。","敲 11 下有 10 个间隔，10×2＝20 秒。"],
+   big:"敲钟、锯木、爬楼、栽树都是同一类题：<b>先分清「次数」和「间隔数」</b>。不成环时，间隔数＝次数−1，先求出一个间隔，再乘新的间隔数。"}
+);
+
+STATIONS.babylon.challenge.push(
+  {id:"ba_cut",icon:"✂️",name:"剪掉一角",star:3,type:"fill",
+   q:"一个长 8 厘米、宽 3 厘米的长方形，从一端剪下一个边长 3 厘米的正方形。剩下部分的周长是多少厘米？",a:16,
+   steps:["剪掉的正方形边长 3，正好等于长方形的宽。","剩下的还是长方形：长 8−3＝5 厘米，宽 3 厘米。","周长＝(5+3)×2＝16 厘米。"],
+   big:"图形被剪开后<b>别急着用原周长加减</b>，先看清剩下的是什么形状、边长各是多少，再重新数一圈。"}
+);
+
+STATIONS.maya.challenge.push(
+  {id:"my_combo3",icon:"👗",name:"三样一起搭",star:2,type:"fill",
+   q:"祭典上要挑 1 件披风、1 条腰带、1 顶羽冠。披风有 3 件、腰带有 2 条、羽冠有 4 顶，一共有多少种不同的装扮？",a:24,
+   steps:["先只看披风和腰带：3×2＝6 种。","这 6 种里，每一种都能配上 4 顶羽冠。","6×4＝24 种。"],
+   big:"搭配问题<b>一层一层地乘</b>：先定第一样，再乘第二样、第三样。这叫<b>乘法原理</b>，比一个一个画树状图快得多。"}
+);
+
+/* ========================================================
+ * 📚 铺满四册 · 第二批：四上 / 四下 的课本缺口单元（2026-08-30）
+ * ======================================================== */
+
+/* 四上① 平行四边形和梯形（第5单元）——《九章算术》方田章正是量田地 */
+STATIONS.china.core.push(
+  {id:"cn_para",name:"平行四边形的边",icon:"▱",gen(){const a=R(4,18),b=R(3,15);return{q:`一个平行四边形相邻的两条边分别是 ${a} 厘米和 ${b} 厘米，周长是多少厘米？`,a:(a+b)*2,hint:"平行四边形对边相等，周长=(相邻两边之和)×2"};}},
+  {id:"cn_trape",name:"梯形的周长",icon:"⏢",gen(){const up=R(3,9),down=up+pick([2,4,6]),leg=R(Math.floor((down-up)/2)+1,9);return{q:`一个等腰梯形，上底 ${up} 厘米、下底 ${down} 厘米，两条腰各 ${leg} 厘米。周长是多少厘米？`,a:up+down+leg*2,hint:"等腰梯形两腰相等，把四条边加起来"};}}
+);
+
+/* 四上② 公顷和平方千米（第2单元）＋ 条形统计图（第7单元） */
+STATIONS.sail.core.push(
+  {id:"sa_hectare",name:"公顷和平方千米",icon:"🗺️",gen(){const n=R(2,9);return Math.random()<0.5
+    ?{q:`${n} 公顷 = 多少平方米？`,a:n*10000,hint:"1公顷=10000平方米"}
+    :{q:`${n} 平方千米 = 多少公顷？`,a:n*100,hint:"1平方千米=100公顷"};}},
+  {id:"sa_bar",name:"条形统计图",icon:"📊",gen(){const v=[R(20,90),R(20,90),R(20,90),R(20,90)];return{q:`航海日志上四个月分别记录到 ${v.join("、")} 艘船。最多的一个月比最少的一个月多几艘？`,a:Math.max(...v)-Math.min(...v),hint:"先找出最高和最低的两根条，再相减"};}}
+);
+
+/* 四下① 小数的加法和减法（第6单元）＋ 观察物体二（第2单元） */
+STATIONS.modern.core.push(
+  {id:"mo_decadd",name:"小数加减法",icon:"🔢",gen(){let x,y;do{x=R(11,199);y=R(11,199);}while(x===y||x%10===0||y%10===0);
+    return x>y?{q:`${(x/10).toFixed(1)} − ${(y/10).toFixed(1)} =`,a:RD((x-y)/10,1),hint:"小数点对齐再减，结果的小数点直接落下来"}
+              :{q:`${(x/10).toFixed(1)} + ${(y/10).toFixed(1)} =`,a:RD((x+y)/10,1),hint:"小数点对齐再加，别按末位对齐"};}},
+  {id:"mo_view",name:"观察物体",icon:"🧊",gen(){const l=R(2,5),w=R(2,4),h=R(2,4);const side=pick(["正面","上面","侧面"]);const a=side==="正面"?l*h:side==="上面"?l*w:w*h;
+    return{q:`用同样的小正方体搭成一个长 ${l}、宽 ${w}、高 ${h} 的长方体。从${side}看，能看到多少个小正方形？`,a,hint:"从正面看是长×高，从上面看是长×宽，从侧面看是宽×高"};}}
+);
+
+/* 四下② 图形的运动（二）· 轴对称与平移（第7单元） */
+STATIONS.rabbit.core.push(
+  {id:"rb_axis",name:"数对称轴",icon:"🦋",gen(){const t=pick([["长方形",2],["正方形",4],["等边三角形",3],["等腰三角形",1],["正五边形",5],["正六边形",6],["菱形",2]]);return{q:`一个${t[0]}有几条对称轴？`,a:t[1],hint:"沿着对称轴对折，两边要能完全重合"};}},
+  {id:"rb_trans",name:"平移的格数",icon:"➡️",gen(){const a=R(4,12),b=R(1,a-1);return{q:`一个图形先向右平移 ${a} 格，再向左平移 ${b} 格。相当于向右平移了多少格？`,a:a-b,hint:"方向相反要相减，剩下的才是实际移动"};}}
+);
+
+STATIONS.china.challenge.push(
+  {id:"cn_tianji",icon:"🐎",name:"田忌赛马",star:3,type:"choice",
+   q:"齐王和田忌各有上、中、下三匹马，三局两胜。田忌每匹马都比齐王同等级的稍差，但田忌的上等马能赢齐王的中等马，田忌的中等马能赢齐王的下等马。田忌该怎么排？",
+   options:["下等马对齐王上等马，上等马对中等马，中等马对下等马","上对上、中对中、下对下","上等马对齐王下等马，中等对上等，下等对中等","怎么排都一样，反正马更差"],a:0,
+   steps:["三局两胜，<b>只要赢两局</b>——所以可以主动认输一局。","把最弱的下等马拿去对齐王最强的上等马：这局必输，但齐王最强的马被「用掉」了。","剩下两局：田忌上等马 vs 齐王中等马（赢），田忌中等马 vs 齐王下等马（赢）。2:1 获胜。"],
+   big:"这就是<b>田忌赛马</b>，四上「数学广角 · 优化」的经典题：<b>用最小的代价换掉对方最强的一项</b>，再拿自己的优势去碰对方的弱项。要点是——不是每局都要赢，而是<b>总局数赢</b>。"}
+);
+
+STATIONS.sail.challenge.push(
+  {id:"sa_pancake",icon:"🥞",name:"烙饼最快要多久",star:3,type:"fill",
+   q:"船上的锅一次最多烙 2 张饼，每张饼两面都要烙，每面 3 分钟。烙 3 张饼最少要多少分钟？",a:9,
+   steps:["笨办法：先烙 2 张（正反 6 分钟），再单烙第 3 张（6 分钟），共 12 分钟——锅有一半时间空着。","诀窍是<b>别让锅空着</b>。第1轮：饼①正面 + 饼②正面。","第2轮：饼①反面 + 饼③正面。第3轮：饼②反面 + 饼③反面。3 轮 × 3 分钟 = 9 分钟。"],
+   big:"「烙饼问题」的思想是<b>让资源一直满负荷</b>。先算总工作量：3 张饼共 6 个面；锅每 3 分钟能烙 2 个面 ⇒ 至少 6÷2＝3 轮 ⇒ 9 分钟。<b>先求理论最少轮数，再想怎么排</b>，比一个个试快得多。"}
+);
+
+STATIONS.modern.challenge.push(
+  {id:"mo_view3",icon:"👀",name:"被挡住的正方体",star:2,type:"fill",
+   q:"用 4 个同样的小正方体，在桌面上摆成 2 行 2 列（只有一层）。从正面看，能看到几个小正方形？",a:2,
+   steps:["只有一层，所以「高」是 1。","2 行 2 列：从正面看过去，后面那一行正好被前面挡住。","看到的是 长 × 高 ＝ 2 × 1 ＝ 2 个。"],
+   big:"「观察物体」要抓住<b>方向 + 被挡住的部分</b>：从正面看只数长和高，从上面看只数长和宽。<b>藏在后面的看不见，但它确实在</b>——这是立体图形和平面图形的分界。"}
+);
+
+STATIONS.rabbit.challenge.push(
+  {id:"rb_fold",icon:"✂️",name:"折纸剪出几个洞",star:2,type:"fill",
+   q:"一张长方形纸，先左右对折一次，再上下对折一次，然后在中间剪一个小口。展开后纸上有几个小口？",a:4,
+   steps:["对折一次，纸变成 2 层。","再对折一次，变成 2×2＝4 层。","剪一刀会穿过全部 4 层，展开就有 4 个口。"],
+   big:"折纸剪洞的关键是<b>数层数</b>：每对折一次层数翻倍（2、4、8…），剪一刀的洞数＝层数。展开后这些洞关于折痕<b>轴对称</b>——这正是「图形的运动」这一单元的直观模型。"}
 );
