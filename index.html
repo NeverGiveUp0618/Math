@@ -311,6 +311,46 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .wg-tip{text-align:center;font-size:13.5px;font-weight:700;color:var(--pink-d);padding:12px 0}
 .gamestage{padding-bottom:26px}
 
+
+/* ---------- 📏 难度档 / 擂台对话 ---------- */
+.tierchip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;color:#8a6f8f;
+  background:rgba(184,164,227,.18);border-radius:12px;padding:4px 10px}
+.tierbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-6px 0 16px;padding:11px 14px;
+  border-radius:18px;background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.95)}
+.tierbar .btn{margin:0;padding:9px 14px;font-size:12.5px;white-space:nowrap;width:auto}
+.tiertip{font-size:11.5px;color:var(--muted)}
+.tierbar .tiertip{flex:1;min-width:120px}
+.tiernote{margin:13px 0 4px;padding:11px 14px;border-radius:15px;font-size:13px;line-height:1.65;text-align:left}
+.tiernote.up{background:rgba(75,191,143,.13);color:var(--good-ink);border:1px solid rgba(75,191,143,.3)}
+.tiernote.down{background:rgba(184,164,227,.16);color:#6f5a8a;border:1px solid rgba(184,164,227,.36)}
+.tierpick{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:10px 0 4px}
+.tierbtn{padding:10px 0;border-radius:13px;background:rgba(184,124,190,.1);font-size:11.5px;font-weight:700;
+  color:#8a6f8f;line-height:1.6}
+.tierbtn.on{background:linear-gradient(135deg,var(--pink),var(--lav));color:#fff}
+.rival .sp{font-size:11.5px;color:var(--lav-d);margin-top:5px;font-weight:700}
+.rivalsay{margin:0 0 12px;padding:11px 14px;border-radius:16px;font-size:13.5px;line-height:1.6;
+  background:rgba(255,255,255,.72);border:1px solid var(--line);color:#6f6277}
+.rivalsay b{color:var(--pink-d)}
+.rivalsay.small{margin:11px 0 0;font-size:12.5px;background:rgba(255,255,255,.55)}
+.gamecard .gstar{font-size:10px;letter-spacing:-1px}
+
+
+/* ---------- 思维题三段阶梯 ---------- */
+.ladderbar{display:flex;gap:6px;margin-bottom:13px}
+.ladderbar span{flex:1;text-align:center;font-size:11px;font-weight:700;color:#b09cb8;
+  background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:13px;padding:7px 2px;line-height:1.4}
+.ladderbar span.on{background:linear-gradient(135deg,var(--pink),var(--lav));color:#fff;border-color:transparent}
+.ladderbar span.done{background:rgba(75,191,143,.14);color:var(--good-ink);border-color:rgba(75,191,143,.32)}
+.anchortag{font-size:12.5px;color:#8a7d92;background:rgba(184,164,227,.13);border-radius:13px;
+  padding:9px 13px;margin-bottom:14px;line-height:1.6}
+.anchortag b{color:var(--lav-d)}
+.outnote{font-size:13px;line-height:1.7;color:#8a7d92;background:rgba(255,244,250,.75);
+  border:1px dashed var(--line);border-radius:15px;padding:12px 14px;margin:16px 0 4px}
+.outnote b{color:var(--pink-d)}
+.gm-ladder{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;font-size:12px;line-height:1.65;color:#8a7d92}
+.gm-ladder div{margin-top:5px}
+.gm-ladder b{display:inline-block;min-width:74px;color:var(--lav-d)}
+
 /* ---------- 底部导航 ---------- */
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:760px;
   display:flex;background:linear-gradient(180deg,rgba(255,251,248,.9),rgba(255,246,250,.98));
@@ -388,6 +428,7 @@ body{background:radial-gradient(circle at 10% 0,#e7f5ff 0,transparent 30%),radia
 </div>
 <div class="toast" id="toast"></div>
 <script src="data.js"></script>
+<script src="ladder.js"></script>
 <script src="games.js"></script>
 <script src="app.js"></script>
 </body>

@@ -31,8 +31,12 @@ function defState() {
     exams: {},              // book -> [{date,right,total}]
     scratchDrafts: {},      // 当前题草稿图片
     totalRight: 0,          // 累计做对题数（成就）
-    pk: { win:0, lose:0, draw:0, plays:0, rounds:0, roundWin:0, duo:0 },  // ⚔️ 擂台战绩（只累加，不掉段）
+    tier: 1,                // 📏 当前难度档 1~5，跟着每轮成绩自动升降
+    tierLock: false,        // 家长可锁死，不再自动调
+    tierLog: [],            // 最近几次调档记录，家长后台看得见
+    pk: { win:0, lose:0, draw:0, plays:0, rounds:0, roundWin:0, duo:0, handicap:0, streakWin:0, streakLose:0 },  // ⚔️ 擂台战绩（只累加，不掉段）
     gameWins: {},           // 🧩 思维游戏 id -> 通关次数
+    ladderDone: {},         // 🌱 走完「课本→进阶→发散」三段的思维题
     testMode: false
   };
 }
@@ -40,7 +44,8 @@ let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
 S.daily = Object.assign({ date: todayStr(), correct: 0 }, S.daily);
 S.attempts = S.attempts || {}; S.timeLog = S.timeLog || {}; S.exams = S.exams || {}; S.scratchDrafts = S.scratchDrafts || {};
-S.pk = Object.assign({ win:0, lose:0, draw:0, plays:0, rounds:0, roundWin:0, duo:0 }, S.pk); S.gameWins = S.gameWins || {};
+S.pk = Object.assign({ win:0, lose:0, draw:0, plays:0, rounds:0, roundWin:0, duo:0, handicap:0, streakWin:0, streakLose:0 }, S.pk); S.gameWins = S.gameWins || {}; S.ladderDone = S.ladderDone || {};
+S.tier = Math.min(5, Math.max(1, Number(S.tier) || 1)); S.tierLog = Array.isArray(S.tierLog) ? S.tierLog : [];
 if (S.daily.date !== todayStr()) S.daily = { date: todayStr(), correct: 0 };
 
 function walletOut() { try { localStorage.setItem(WALLET_KEY, JSON.stringify({ coins: S.coins || 0, tickets: S.tickets || 0 })); } catch (e) {} }
@@ -91,14 +96,66 @@ function markAttempt(id, ok) {
   S.attempts[id]=a; save();
 }
 function weakSkills(civ) {
-  const skills=(civ?ST(civ).core:Object.values(STATIONS).flatMap(s=>s.core));
+  const skills=(civ?ST(civ).core:ALL_SKILLS());
   return skills.filter(x=>{const a=S.attempts[x.id];return a&&a.total>=2&&a.right/a.total<.75;}).sort((a,b)=>(S.attempts[a.id].right/S.attempts[a.id].total)-(S.attempts[b.id].right/S.attempts[b.id].total));
 }
 
+
+/* ---------- 📏 难度梯度（2026-09-02） ----------
+ * 孩子反馈「有点难」。两条腿：
+ *   ① poolForTier：低档只出低难度知识点，档位不够就退而取最简单的一半
+ *   ② 一轮之内 sortByLv：先易后难，前几题先把信心立起来
+ * 档位由 adjustTier 按每轮正确率自动升降，家长可在后台锁死。
+ */
+function skillLv(sk) {
+  if (!sk) return 3;
+  if (typeof sk.lv === "number") return sk.lv;                    // 热身口算自带
+  if (SKILL_LV[sk.id]) return SKILL_LV[sk.id];
+  const civ = CIVS.find(c => ((STATIONS[c.id] || {}).core || []).some(x => x.id === sk.id));
+  return civ ? ({ "三上":2, "三下":2, "四上":3, "四下":3, "五上":4, "五下":4, "六上":5, "六下":5 }[civ.book] || 3) : 3;
+}
+function ALL_SKILLS() { return Object.values(STATIONS).flatMap(s => s.core).concat(WARMUP_SKILLS); }
+function sortByLv(list) { return list.slice().sort((a, b) => skillLv(a) - skillLv(b)); }
+function tierInfo() { return TIERS[Math.min(5, Math.max(1, S.tier)) - 1]; }
+/* 按档位筛池：够 3 个就用筛出来的，不够就取整池里最简单的一半（宁可简单也别卡住） */
+function poolForTier(pool, tier) {
+  if (!pool || !pool.length) return [];
+  const t = tier || S.tier;
+  const fit = pool.filter(s => skillLv(s) <= t);
+  if (fit.length >= 3) return fit;
+  return sortByLv(pool).slice(0, Math.max(3, Math.ceil(pool.length / 2)));
+}
+/* 一轮结束按正确率调档。返回 "up"/"down"/null，调用方负责说人话。 */
+function adjustTier(right, total) {
+  if (S.tierLock || total < 5) return null;
+  const rate = right / total;
+  let moved = null;
+  if (rate >= 0.85 && S.tier < 5) { S.tier++; moved = "up"; }
+  else if (rate <= 0.45 && S.tier > 1) { S.tier--; moved = "down"; }
+  if (moved) {
+    S.tierLog.push({ date: todayStr(), to: S.tier, rate: Math.round(rate * 100) });
+    S.tierLog = S.tierLog.slice(-12);
+    save();
+  }
+  return moved;
+}
+function tierMovedNote(moved) {
+  if (!moved) return "";
+  const t = tierInfo();
+  return moved === "up"
+    ? `<div class="tiernote up">${t.icon} 这轮做得很稳，白白把难度调到「${esc(t.name)}」了 —— ${esc(t.blurb)}</div>`
+    : `<div class="tiernote down">${t.icon} 白白把难度调回「${esc(t.name)}」了 —— ${esc(t.blurb)}。慢慢来，题会跟着你走。</div>`;
+}
+function tierChip() { const t = tierInfo(); return `<span class="tierchip">${t.icon} 难度：${esc(t.name)}</span>`; }
+
 /* ---------- SRS ---------- */
-const ST = civ => STATIONS[civ || S.civ];   // 当前文明站内容
+/* 🌱 热身口算是个「假站」：只在 app 里存在，不进 STATIONS，
+   免得全站结构体检（labels/extend/challenge 三件套）把它当成缺字段的文明站。 */
+const WARMUP_STATION = { labels: { core: "🌱 热身口算 · 先把底子练熟，题目都很短", extend: "", challenge: "" },
+  core: WARMUP_SKILLS, extend: { cards: [], tricks: [], play: [] }, challenge: [] };
+const ST = civ => { const id = civ || S.civ; return id === "warmup" ? WARMUP_STATION : STATIONS[id]; };   // 当前文明站内容
 function srsDueList(civ) { const t = todayStr(); const st = ST(civ); if (!st) return []; return st.core.filter(s => { const r = S.srs[s.id]; return r && r.due <= t; }); }
-function srsDueAll() { const t = todayStr(); return Object.values(STATIONS).flatMap(s => s.core).filter(s => { const r = S.srs[s.id]; return r && r.due <= t; }); }
+function srsDueAll() { const t = todayStr(); return ALL_SKILLS().filter(s => { const r = S.srs[s.id]; return r && r.due <= t; }); }
 function srsGrade(id, ok) {
   const t = todayStr();
   let r = S.srs[id] || { lv: 0, due: t };
@@ -195,7 +252,7 @@ function render() {
   const scr = $("#screen");
   $("#backBtn").classList.toggle("hidden", ["map","review","rewards","pk","think"].includes(S.view));
   $("#learningHome").classList.toggle("hidden", !["map","review","exam","rewards","pk","think"].includes(S.view));
-  if (pkTimer) { clearTimeout(pkTimer); pkTimer = null; }
+  clearPkTimers();
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.v === S.view));
   if (S.view === "map") return renderMap(scr);
   if (S.view === "station") return renderStation(scr);
@@ -235,10 +292,12 @@ function renderMap(scr) {
   const weak=weakSkills(),recommend=weak.length?`白白发现「${esc(weak[0].name)}」值得再试一次。不是退步，是大脑正在长新路。`:`今天没有必须完成的内容，挑一个好奇的地方就行。`;
   scr.innerHTML = `<div class="map-hero"><h2>今天想解开哪个数学秘密？</h2><p>从课本出发，再多走一步。每一次尝试都算一次新发现。</p></div><div class="guide baibai">${baibaiAvatar()}<div class="bubble">${greet}</div></div>
     <div class="recommend"><b>🐾 白白的小建议</b><span>${recommend}</span><button class="btn" id="examBtn">📝 阶段测验</button></div>
+    <div class="tierbar">${tierChip()}<span class="tiertip">题目会自己跟着你的水平走${S.tierLock ? "（家长已锁定）" : ""}</span><button class="btn" id="warmBtn">🌱 热身口算</button></div>
     <div class="wonderbar"><div class="t">🏺 数学奇观收藏（集齐一站的三颗星就能点亮）</div><div class="row">${wrow}</div></div>
     ${civs}<button class="math-parent-entry" id="mathParentEntry">🔐 家长设置</button>`;
   scr.querySelectorAll(".civ[data-civ]").forEach(el => el.onclick = () => go("station", { civ: el.dataset.civ }));
   $("#examBtn").onclick=()=>go("exam");
+  $("#warmBtn").onclick=()=>{sess=null;go("core",{civ:"warmup"});};
   $("#mathParentEntry").onclick=()=>go("parent");
 }
 
@@ -269,29 +328,38 @@ function renderStation(scr) {
 
 /* ---------- 🌱 课内夯实：跑题 ---------- */
 let sess = null;
+/* 排一轮的出题计划：按当前难度档筛池，到期复习和薄弱点优先占坑，
+   最后整轮按难度从易到难排 —— 前几题先把信心立起来。 */
+function buildPlan(pool, n, civ) {
+  const fit = poolForTier(pool, S.tier);
+  if (!fit.length) return [];
+  const picks = [];
+  const push = s => { if (s && fit.includes(s) && picks.length < Math.ceil(n / 2) && !picks.includes(s)) picks.push(s); };
+  srsDueList(civ).forEach(push);
+  weakSkills(civ).forEach(push);
+  while (picks.length < n) picks.push(fit[Math.floor(Math.random() * fit.length)]);
+  return sortByLv(picks.slice(0, n));
+}
 function renderCore(scr) {
-  $("#title").textContent = "课内夯实";
+  $("#title").textContent = ST(S.civ) === WARMUP_STATION ? "热身口算" : "课内夯实";
   if (!sess || sess.mode !== "core") {
-    sess = { mode: "core", civ: S.civ, i: 0, n: 8, right: 0, cur: null, revealed: false };
+    const pool = ST(S.civ).core;
+    sess = { mode: "core", civ: S.civ, i: 0, n: 8, right: 0, cur: null, revealed: false, plan: buildPlan(pool, 8, S.civ) };
   }
   nextCore(scr);
 }
 function nextCore(scr) {
   if (sess.i >= sess.n) return coreDone(scr);
-  // 优先出本站到期复习题，否则本站随机
-  let skill;
-  const due = srsDueList(sess.civ), pool = ST(sess.civ).core;
-  const weak=weakSkills(sess.civ);
-  if (due.length) skill = due[Math.floor(Math.random() * due.length)];
-  else if(weak.length&&Math.random()<.55) skill=weak[Math.floor(Math.random()*Math.min(3,weak.length))];
-  else skill = pool[Math.floor(Math.random() * pool.length)];
+  // 计划在开轮时就排好了（按难度从易到难），这里按顺序取
+  const pool = ST(sess.civ).core;
+  const skill = (sess.plan && sess.plan[sess.i]) || pool[Math.floor(Math.random() * pool.length)];
   const prob = skill.gen();
   sess.cur = { skill, prob, isDue: !!(S.srs[skill.id] && S.srs[skill.id].due <= todayStr()) };
   sess.revealed = false;
   scr.className = "stage";
   scr.innerHTML = `<div class="progress"><i style="width:${sess.i / sess.n * 100}%"></i></div>
     <div class="qcard">
-      <div class="qmeta"><span>${skill.icon} ${skill.name}${sess.cur.isDue ? " · 复习" : ""}</span><span>第 ${sess.i + 1}/${sess.n} 题</span></div>
+      <div class="qmeta"><span>${skill.icon} ${skill.name}${sess.cur.isDue ? " · 复习" : ""}</span><span>${"◆".repeat(skillLv(skill))}<span style="opacity:.35">${"◇".repeat(5 - skillLv(skill))}</span> · 第 ${sess.i + 1}/${sess.n} 题</span></div>
       <div class="qtext">${prob.q}</div>
       <div class="answerbox"><input id="ans" type="number" inputmode="numeric" placeholder="点这里填写答案" autocomplete="off"><button class="btn" id="ok">确定</button></div>${scratchPadHtml()}
       <div class="feedback" id="fb"></div>
@@ -333,15 +401,18 @@ function nextCore(scr) {
   $("#nextb").onclick = () => { sess.i++; nextCore(scr); };
 }
 function coreDone(scr) {
-  const passed = sess.right >= 6;
-  if (passed) setStar(sess.civ, "core");
+  const passed = sess.right >= 6, civ = sess.civ;
+  if (passed && civ !== "warmup") setStar(civ, "core");
+  const moved = adjustTier(sess.right, sess.n);
+  const c = CIVS.find(x => x.id === civ);
   scr.className = "stage";
   scr.innerHTML = `<div class="qcard" style="text-align:center">
     <div style="font-size:52px">${passed ? "🏆" : "💪"}</div>
     <div class="qtext">这一轮做对 ${sess.right}/${sess.n} 题</div>
-    <p style="font-size:14px;opacity:.8;line-height:1.6">${passed ? "课本练得又快又准，课内夯实这颗星拿下！" : "答对 6 题就能点亮这颗星，再来一轮就好～"}</p>
+    <p style="font-size:14px;opacity:.8;line-height:1.6">${civ === "warmup" ? (passed ? "口算又快又准，底子稳了！" : "口算多练几轮就顺了，不着急～") : passed ? "课本练得又快又准，课内夯实这颗星拿下！" : "答对 6 题就能点亮这颗星，再来一轮就好～"}</p>
+    ${tierMovedNote(moved)}
     <button class="btn wide" id="again">再练一轮</button>
-    <button class="btn ghost wide" id="back">回到古埃及</button></div>`;
+    <button class="btn ghost wide" id="back">${c ? "回到" + esc(c.name) : "返回"}</button></div>`;
   sess = null;
   $("#again").onclick = () => renderCore(scr);
   $("#back").onclick = () => back();
@@ -411,10 +482,52 @@ function renderChallengeList(scr) {
   scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">慢慢想也很厉害</div>这里不比速度。可以画一画、试一试，实在想不出再看提示。</div></div>${list}
     <button class="btn ghost wide" id="toThink">🧩 去思维乐园：看全部 ${ALL_CHALLENGES().length} 道思维题 + 6 个动手游戏</button>`;
   $("#toThink").onclick = () => { nav = []; S.view = "think"; render(); };
-  scr.querySelectorAll(".readcard[data-i]").forEach(el => el.onclick = () => go("challengeRun", { sub: Number(el.dataset.i) }));
+  scr.querySelectorAll(".readcard[data-i]").forEach(el => el.onclick = () => { chStep = 0; go("challengeRun", { sub: Number(el.dataset.i) }); });
 }
+/* 思维题走三段：📘 课本这一招 → 🧠 进阶挑战 → 🌱 再想远一点。
+   用户要求「靠到教材的知识点上，再进阶，再发散」，chStep 就是这三段的游标。 */
+let chStep = 0;
 function renderChallenge(scr) {
-  const civ = S.civ, c = ST(civ).challenge[S.sub];
+  const civ = S.civ, c = ST(civ).challenge[S.sub], L = CHALLENGE_LADDER[c.id];
+  if (!L) chStep = 1;                                  // 万一哪道新题还没配阶梯，直接走原来的挑战
+  if (chStep === 0) return renderChAnchor(scr, c, L);
+  if (chStep === 2) return renderChOut(scr, c, L);
+  return renderChMain(scr, civ, c, L);
+}
+
+/* ① 📘 课本这一招：先确认这道挑战靠在哪个教材知识点上 */
+function renderChAnchor(scr, c, L) {
+  $("#title").textContent = c.name;
+  scr.className = "stage";
+  scr.innerHTML = `<div class="ladderbar"><span class="on">📘 课本这一招</span><span>🧠 进阶挑战</span><span>🌱 再想远一点</span></div>
+    <div class="qcard">
+      <div class="qmeta"><span>📘 ${esc(L.unit)}</span><span>${"⭐".repeat(c.star)}</span></div>
+      <div class="anchortag">这道挑战用的是课本上的：<b>${esc(L.point)}</b></div>
+      <div class="qtext" style="font-size:20px">${L.anchor.q}</div>
+      <div class="answerbox"><input id="ans" type="number" inputmode="decimal" placeholder="先做这一步" autocomplete="off"><button class="btn" id="ok">确定</button></div>
+      <div class="feedback" id="fb"></div>
+      <button class="btn wide hidden" id="goMain">好，去挑战 ›</button>
+      <button class="btn ghost wide" id="skip">这一步我会了，直接挑战 ›</button>
+    </div>`;
+  let done = false;
+  const pass = ok => {
+    if (done) return; done = true;
+    const fb = $("#fb");
+    fb.className = `feedback ${ok ? "ok" : "no"} show`;
+    fb.innerHTML = `${ok ? "对！" : `这一步的答案是 <b>${L.anchor.a}</b>。`}${L.anchor.why}`;
+    $("#ans").disabled = true; $("#ok").classList.add("hidden");
+    $("#skip").classList.add("hidden"); $("#goMain").classList.remove("hidden");
+    if (ok) { addCoins(1); markCorrect(); }
+  };
+  const submit = () => { const v = $("#ans").value.trim(); if (v === "") return; pass(Number(v) === L.anchor.a); };
+  $("#ok").onclick = submit;
+  $("#ans").onkeydown = e => { if (e.key === "Enter") submit(); };
+  $("#skip").onclick = () => { chStep = 1; render(); };
+  $("#goMain").onclick = () => { chStep = 1; render(); };
+}
+
+/* ② 🧠 进阶挑战：原来那道思维题 */
+function renderChMain(scr, civ, c, L) {
   $("#title").textContent = c.name;
   scr.className = "stage";
   let body;
@@ -423,15 +536,17 @@ function renderChallenge(scr) {
   } else {
     body = `<div class="answerbox"><input id="ans" type="number" inputmode="numeric" placeholder="点这里填写答案" autocomplete="off"><button class="btn" id="ok">确定</button></div>${scratchPadHtml()}`;
   }
-  scr.innerHTML = `<div class="qcard">
+  scr.innerHTML = `${L ? `<div class="ladderbar"><span class="done">📘 课本这一招</span><span class="on">🧠 进阶挑战</span><span>🌱 再想远一点</span></div>` : ""}
+  <div class="qcard">
     <div class="qmeta"><span>${c.icon} ${esc(c.name)}</span><span>${"⭐".repeat(c.star)}</span></div>
+    ${L ? `<div class="anchortag">同一招再往前一步：<b>${esc(L.point)}</b>（${esc(L.unit)}）</div>` : ""}
     <div class="qtext" style="font-size:18px;text-align:left;line-height:1.6">${c.q}</div>
     ${body}
     <div class="feedback" id="fb"></div>
     <div class="hints" id="hints"></div>
     <button class="btn ghost wide" id="hintBtn">🤔 想不出？看一条思路</button>
     <div class="bigidea hidden" id="big"><div class="t">💡 解题大招</div>${c.big}</div>
-    <button class="btn wide hidden" id="doneb">破解啦，返回 ›</button>
+    <button class="btn wide hidden" id="doneb">${L ? "再想远一点 ›" : "破解啦，返回 ›"}</button>
   </div>`;
   bindScratchPad(scr);
   let hi = 0, solved = false;
@@ -461,35 +576,83 @@ function renderChallenge(scr) {
     const submit = () => { const v = $("#ans").value.trim(); if (v === "") return; if (Number(v) === c.a) { $("#ans").disabled = true; $("#ok").classList.add("hidden"); right(); } else wrong(); };
     $("#ok").onclick = submit; $("#ans").onkeydown = e => { if (e.key === "Enter") submit(); };
   }
-  $("#doneb").onclick = () => back();
+  $("#doneb").onclick = () => { if (L) { chStep = 2; render(); } else back(); };
+}
+
+/* ③ 🌱 再想远一点：开放追问，不判对错 —— 目的是敢想，不是再考一次 */
+function renderChOut(scr, c, L) {
+  $("#title").textContent = c.name;
+  scr.className = "stage";
+  scr.innerHTML = `<div class="ladderbar"><span class="done">📘 课本这一招</span><span class="done">🧠 进阶挑战</span><span class="on">🌱 再想远一点</span></div>
+    <div class="qcard">
+      <div class="qmeta"><span>🌱 发散一下</span><span>不判对错</span></div>
+      <div class="qtext" style="font-size:18px;text-align:left;line-height:1.65">${L.out.q}</div>
+      <div class="outnote">先自己想一会儿，也可以说给爸爸妈妈听。想好了再看白白的想法 —— <b>想得跟白白不一样也很好</b>。</div>
+      <button class="btn wide" id="showIdea">看看白白怎么想 ›</button>
+      <div class="bigidea hidden" id="idea"><div class="t">🐾 白白的想法</div>${L.out.idea}</div>
+      <button class="btn ghost wide hidden" id="outBack">想完了，返回 ›</button>
+    </div>`;
+  $("#showIdea").onclick = () => {
+    $("#idea").classList.remove("hidden");
+    $("#showIdea").classList.add("hidden");
+    $("#outBack").classList.remove("hidden");
+    if (!S.ladderDone[c.id]) { S.ladderDone[c.id] = true; addCoins(3); toast("走完三段阶梯 +3 🪙"); save(); }
+  };
+  $("#outBack").onclick = () => { chStep = 0; back(); };
 }
 
 
 /* ============================================================
- * ⚔️ PK 擂台（2026-09-02 新增）
- * 一个人也能对战：对手按「正确率 + 思考快慢」模拟，不是真人。
- * 柔和优先——输了照样给金币，没有连败惩罚，段位只升不降。
+ * ⚔️ PK 擂台
+ * 2026-09-02 重做，起因是孩子反馈「人机对战看着假，机器人反应太快，赢不了」。
+ * 对手是模拟的，但会打招呼、会卡壳、会算错、会认输；速度大幅放慢；
+ * 计分以答对为主（12 分）速度为辅（4 分）；连输还会自动放水。
  * ============================================================ */
-let pkSess = null, pkTimer = null;
-const PK_BOOKS = ["综合", "三上", "三下", "四上", "四下", "五上", "五下", "六上", "六下"];
-function pkPool(book) { return book === "综合" ? CIVS.filter(c => ["三上","三下","四上","四下"].includes(c.book)).flatMap(c => (STATIONS[c.id] || {core:[]}).core) : bookSkills(book); }
+let pkSess = null, pkTimers = [];
+function clearPkTimers() { pkTimers.forEach(t => clearTimeout(t)); pkTimers = []; }
+const PK_BOOKS = ["适合我", "🌱 热身", "三上", "三下", "四上", "四下", "五上", "五下", "六上", "六下"];
+function pkPool(book) {
+  if (book === "🌱 热身") return WARMUP_SKILLS;
+  if (book === "适合我") {           // 跟着当前难度档走：全站够得着的知识点 + 热身垫底
+    const reach = CIVS.flatMap(c => (STATIONS[c.id] || { core: [] }).core).filter(s => skillLv(s) <= S.tier);
+    return (S.tier <= 2 ? WARMUP_SKILLS : []).concat(reach.length ? reach : WARMUP_SKILLS);
+  }
+  return bookSkills(book);
+}
 function pkRank() { const w = S.pk.win || 0; return PK_RANKS.slice().reverse().find(r => w >= r.at) || PK_RANKS[0]; }
 function pkNextRank() { const w = S.pk.win || 0; return PK_RANKS.find(r => w < r.at); }
+const pkLine = k => PK_TALK[k][Math.floor(Math.random() * PK_TALK[k].length)];
+/* 让分：连输就把对手调弱（算得更慢、更容易错），连赢再调回来。范围 -2 ~ +1。
+   这是「赢不了」那条反馈的正面解法 —— 不改题目难度，改对手。 */
+function pkRival(base) {
+  const h = Math.max(-2, Math.min(1, S.pk.handicap || 0));
+  return Object.assign({}, base, {
+    acc: Math.max(.2, Math.min(.95, base.acc + h * 0.12)),
+    fast: Math.round(base.fast * (1 - h * 0.18)),
+    slow: Math.round(base.slow * (1 - h * 0.18)),
+    handicap: h
+  });
+}
 
 function renderPk(scr) {
   $("#title").textContent = "PK 擂台";
-  scr.className = "stage"; nav = []; pkSess = null;
+  scr.className = "stage"; nav = []; pkSess = null; clearPkTimers();
   const rank = pkRank(), nxt = pkNextRank(), p = S.pk;
-  const rivals = PK_RIVALS.map(r => `<div class="rival" data-r="${r.id}">
+  const rivals = PK_RIVALS.map(r => {
+    const adj = pkRival(r);
+    return `<div class="rival" data-r="${r.id}">
       <div class="ico">${r.icon}</div>
       <div class="info"><div class="nm">${esc(r.name)}<span class="lvl">${"🔥".repeat(PK_RIVALS.indexOf(r) + 1)}</span></div>
-        <div class="ti">${esc(r.title)}</div><div class="bl">${esc(r.blurb)}</div></div>
-      <div class="go">对战 ›</div></div>`).join("");
-  scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">想比一场吗？</div>擂台上一共 8 题，<b>答对得分，比对手快还有速度分</b>。<div class="soft">输了也有金币 —— 我们是来找乐子的，不是来分高下的。</div></div></div>
+        <div class="ti">${esc(r.title)}</div><div class="bl">${esc(r.blurb)}</div>
+        <div class="sp">大约 ${Math.round(adj.fast / 1000)}～${Math.round(adj.slow / 1000)} 秒交一题${adj.handicap < 0 ? "（今天状态一般）" : adj.handicap > 0 ? "（最近很来劲）" : ""}</div></div>
+      <div class="go">对战 ›</div></div>`;
+  }).join("");
+  scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">想比一场吗？</div>擂台上一共 8 题。<b>答对 12 分是大头，先交卷只多 4 分</b> —— 算得慢但算得对，照样赢。<div class="soft">输了也有金币。连输两场，对手会自动放水。</div></div></div>
     <div class="rankcard"><div class="rk">${rank.icon}</div><div><div class="rkn">${esc(rank.name)}</div>
       <div class="rks">赢过 <b>${p.win}</b> 场 · 打平 <b>${p.draw}</b> · 惜败 <b>${p.lose}</b>${p.duo ? ` · 同屏对战 <b>${p.duo}</b> 局` : ""}</div>
       <div class="rks">${nxt ? `再赢 <b>${nxt.at - p.win}</b> 场就是「${esc(nxt.name)}」${nxt.icon}` : "已经是擂台最高段位啦 👑"}</div></div></div>
-    <div class="panel"><h3>📚 出题范围</h3><div class="exam-picks">${PK_BOOKS.map(b => `<button class="exam-pick ${(S.pkBook || "综合") === b ? "on" : ""}" data-book="${b}">${b}<br><small>${pkPool(b).length}个知识点</small></button>`).join("")}</div></div>
+    <div class="panel"><h3>📚 出题范围 ${tierChip()}</h3><div class="exam-picks">${PK_BOOKS.map(b => `<button class="exam-pick ${(S.pkBook || "适合我") === b ? "on" : ""}" data-book="${b}">${b}<br><small>${b === "适合我" ? "跟着难度走" : pkPool(b).length + "个知识点"}</small></button>`).join("")}</div>
+      <div class="note">「适合我」会按你现在的难度挑题；觉得吃力就选「🌱 热身」，全是口算。</div></div>
     <div class="panel"><h3>⚔️ 挑一个对手</h3>${rivals}</div>
     <div class="panel"><h3>👫 同屏对战</h3><div class="note">和家人、同学用同一台手机轮流答题，各 6 道，比谁答对得多。没有计时。</div>
       <button class="btn wide" id="duoBtn">两个人一起玩 ›</button></div>`;
@@ -499,65 +662,78 @@ function renderPk(scr) {
 }
 
 function startPk(rivalId) {
-  const rival = PK_RIVALS.find(r => r.id === rivalId), book = S.pkBook || "综合", pool = pkPool(book);
+  const base = PK_RIVALS.find(r => r.id === rivalId), book = S.pkBook || "适合我", pool = pkPool(book);
   if (!pool.length) return toast("这一册还没有题，换一个范围");
-  pkSess = { mode: "solo", rival, book, pool, i: 0, n: 8, me: 0, rv: 0, log: [], phase: "q" };
+  pkSess = { mode: "solo", rival: pkRival(base), baseId: rivalId, book, pool, plan: buildPlan(pool, 8), i: 0, n: 8, me: 0, rv: 0, greeted: false };
   go("pkRun");
 }
 function startDuo() {
-  const book = S.pkBook || "综合", pool = pkPool(book);
+  const book = S.pkBook || "适合我", pool = pkPool(book);
   if (!pool.length) return toast("这一册还没有题，换一个范围");
-  pkSess = { mode: "duo", book, pool, i: 0, n: 12, a: 0, b: 0, names: ["玩家 1", "玩家 2"], log: [] };
+  pkSess = { mode: "duo", book, pool, plan: buildPlan(pool, 12), i: 0, n: 12, a: 0, b: 0, names: ["玩家 1", "玩家 2"] };
   go("pkRun");
 }
 
+const PK_RIGHT = 12, PK_SPEED = 4;      // 答对是大头，速度只是零头 —— 算得慢也能赢
+
 function renderPkRun(scr) {
   if (!pkSess) { S.view = "pk"; return render(); }
+  clearPkTimers();
   scr.className = "stage";
   if (pkSess.mode === "duo") return duoRound(scr);
   if (pkSess.i >= pkSess.n) return pkDone(scr);
-  const skill = pkSess.pool[Math.floor(Math.random() * pkSess.pool.length)], prob = skill.gen();
+  const skill = (pkSess.plan && pkSess.plan[pkSess.i]) || pkSess.pool[Math.floor(Math.random() * pkSess.pool.length)];
+  const prob = skill.gen();
   pkSess.cur = { skill, prob };
   const rival = pkSess.rival;
   const rivalOk = Math.random() < rival.acc;
-  const rivalMs = rival.fast + Math.floor(Math.random() * (rival.slow - rival.fast));
+  const stuck = Math.random() < 0.18;                       // 偶尔卡壳，像真人一样会想很久
+  let rivalMs = rival.fast + Math.floor(Math.random() * (rival.slow - rival.fast));
+  if (stuck) rivalMs = Math.round(rivalMs * 1.5);
+  rivalMs = Math.max(9000, rivalMs);                        // 谁都不可能 9 秒内读完题就交卷
   const t0 = Date.now();
-  let answered = false, rivalArrived = false;
+  let answered = false;
   $("#title").textContent = `擂台 · ${rival.name}`;
+  const hello = pkSess.greeted ? "" : `<div class="rivalsay">${rival.icon} <b>${esc(rival.name)}</b>：${esc(pkLine("hello"))}</div>`;
+  pkSess.greeted = true;
   scr.innerHTML = `<div class="progress"><i style="width:${pkSess.i / pkSess.n * 100}%"></i></div>
     <div class="pkbar"><div class="side me"><span>${baibaiAvatar("mini")}</span><b>${pkSess.me}</b><small>我</small></div>
       <div class="vs">VS</div>
       <div class="side rv"><span class="ric">${rival.icon}</span><b>${pkSess.rv}</b><small>${esc(rival.name)}</small></div></div>
+    ${hello}
     <div class="qcard">
-      <div class="qmeta"><span>${skill.icon} ${esc(skill.name)}</span><span>第 ${pkSess.i + 1}/${pkSess.n} 题</span></div>
+      <div class="qmeta"><span>${skill.icon} ${esc(skill.name)}</span><span>${"◆".repeat(skillLv(skill))}<span style="opacity:.35">${"◇".repeat(5 - skillLv(skill))}</span> · 第 ${pkSess.i + 1}/${pkSess.n} 题</span></div>
       <div class="qtext">${prob.q}</div>
-      <div class="answerbox"><input id="ans" type="number" inputmode="decimal" placeholder="想好就填，别急" autocomplete="off"><button class="btn" id="ok">交卷</button></div>
-      <div class="rivalthink" id="rvthink">${rival.icon} ${esc(rival.name)}正在算……</div>
+      <div class="answerbox"><input id="ans" type="number" inputmode="decimal" placeholder="想好再填，不用抢" autocomplete="off"><button class="btn" id="ok">交卷</button></div>
+      <div class="rivalthink" id="rvthink">${rival.icon} ${esc(rival.name)}正在读题……</div>
       ${scratchPadHtml()}
       <div class="feedback" id="fb"></div>
     </div>
     <button class="btn ghost wide hidden" id="nextb">下一题 ›</button>`;
   bindScratchPad(scr);
-  pkTimer = setTimeout(() => {
-    rivalArrived = true;
-    const box = $("#rvthink"); if (box) { box.classList.add("done"); box.innerHTML = `${rival.icon} ${esc(rival.name)}已经交卷了 —— 别慌，答对更重要。`; }
-  }, rivalMs);
+  /* 对手分三段推进：读题 → 打草稿 →（可能卡壳）→ 交卷。全程不剧透他答得对不对。 */
+  const setThink = html => { const b = $("#rvthink"); if (b && !answered) b.innerHTML = html; };
+  pkTimers.push(setTimeout(() => setThink(`${rival.icon} ${esc(rival.name)}在草稿纸上算……`), Math.round(rivalMs * 0.3)));
+  if (stuck) pkTimers.push(setTimeout(() => setThink(`${rival.icon} <b>${esc(rival.name)}</b>：${esc(pkLine("stuck"))}`), Math.round(rivalMs * 0.55)));
+  pkTimers.push(setTimeout(() => {
+    const b = $("#rvthink"); if (b && !answered) { b.classList.add("done"); b.innerHTML = `${rival.icon} ${esc(rival.name)}交卷了 —— 别慌，<b>答对才是大头</b>。`; }
+  }, rivalMs));
 
   const submit = () => {
     if (answered) return;
     const v = $("#ans").value.trim(); if (v === "") return;
-    answered = true; if (pkTimer) { clearTimeout(pkTimer); pkTimer = null; }
+    answered = true; clearPkTimers();
     const myMs = Date.now() - t0, ok = Number(v) === prob.a;
     const faster = myMs < rivalMs;
     let mine = 0, theirs = 0;
-    if (ok) { mine = 10 + (faster ? 5 : 0); pkSess.me += mine; markAttempt(skill.id, true); srsGrade(skill.id, true); markCorrect(); }
+    if (ok) { mine = PK_RIGHT + (faster ? PK_SPEED : 0); pkSess.me += mine; markAttempt(skill.id, true); srsGrade(skill.id, true); markCorrect(); }
     else { markAttempt(skill.id, false); srsGrade(skill.id, false); }
-    if (rivalOk) { theirs = 10 + (faster ? 0 : 5); pkSess.rv += theirs; }
+    if (rivalOk) { theirs = PK_RIGHT + (faster ? 0 : PK_SPEED); pkSess.rv += theirs; }
     S.pk.rounds = (S.pk.rounds || 0) + 1; if (mine > theirs) S.pk.roundWin = (S.pk.roundWin || 0) + 1; save();
     const fb = $("#fb");
     fb.className = `feedback ${ok ? "ok" : "no"} show`;
-    fb.innerHTML = `${ok ? `答对！<b>+${mine} 分</b>${faster ? "（还比对手快，速度分到手 ⚡）" : ""}` : `这题的答案是 <b>${prob.a}</b>。${prob.hint ? "<br>" + prob.hint : ""}`}
-      <br><span style="opacity:.8">${rival.icon} ${esc(rival.name)}${rivalOk ? `答对了，得 ${theirs} 分` : "也答错了，一分没拿"}。用时 ${(rivalMs / 1000).toFixed(1)} 秒，你用了 ${(myMs / 1000).toFixed(1)} 秒。</span>`;
+    fb.innerHTML = `${ok ? `答对！<b>+${mine} 分</b>${faster ? `（还比${esc(rival.name)}快，速度分也拿到 ⚡）` : ""}` : `这题的答案是 <b>${prob.a}</b>。${prob.hint ? "<br>" + prob.hint : ""}`}
+      <div class="rivalsay small">${rival.icon} <b>${esc(rival.name)}</b>：${esc(pkLine(rivalOk ? "right" : "wrong"))}${rivalOk ? `（+${theirs} 分）` : "（这题没拿到分）"}</div>`;
     $("#ans").disabled = true; $("#ok").classList.add("hidden"); $("#nextb").classList.remove("hidden");
     $("#rvthink").classList.add("hidden");
   };
@@ -571,6 +747,12 @@ function pkDone(scr) {
   const win = s.me > s.rv, draw = s.me === s.rv;
   S.pk.plays = (S.pk.plays || 0) + 1;
   if (win) S.pk.win++; else if (draw) S.pk.draw++; else S.pk.lose++;
+  /* 让分：连输两场→对手放水一档；连赢三场→调回来。上下都封顶，不会滚成碾压或送分。 */
+  if (win) { S.pk.streakWin = (S.pk.streakWin || 0) + 1; S.pk.streakLose = 0; }
+  else if (!draw) { S.pk.streakLose = (S.pk.streakLose || 0) + 1; S.pk.streakWin = 0; }
+  let handicapNote = "";
+  if (S.pk.streakLose >= 2 && (S.pk.handicap || 0) > -2) { S.pk.handicap = (S.pk.handicap || 0) - 1; S.pk.streakLose = 0; handicapNote = `下一场${esc(rival.name)}会慢一点、也更容易算错 —— 白白偷偷帮你说好了。`; }
+  if (S.pk.streakWin >= 3 && (S.pk.handicap || 0) < 1) { S.pk.handicap = (S.pk.handicap || 0) + 1; S.pk.streakWin = 0; handicapNote = `你连赢三场，${esc(rival.name)}要拿出真本事了。`; }
   const coin = win ? rival.coin : draw ? Math.round(rival.coin * .7) : Math.round(rival.coin * .5);
   addCoins(coin); save();
   const rank = pkRank();
@@ -579,12 +761,13 @@ function pkDone(scr) {
     <div style="font-size:52px">${win ? "🏆" : draw ? "🤝" : "💪"}</div>
     <div class="qtext">${win ? "赢了这一场！" : draw ? "打成平手！" : "这场惜败"}</div>
     <div class="pkscore"><div><b>${s.me}</b><small>我</small></div><div class="vs">:</div><div><b>${s.rv}</b><small>${esc(rival.name)}</small></div></div>
-    <p style="font-size:14px;opacity:.85;line-height:1.7">${win ? `${rival.icon} ${esc(rival.name)}服气了。` : draw ? "势均力敌，下一场再决胜负。" : `${rival.icon} ${esc(rival.name)}这次快了一点点 —— 但你每答对一题都是真的会了。`}
-      <br><b>+${coin} 🪙</b>${win ? "" : "（输赢都有金币）"}<br>当前段位：${rank.icon} ${esc(rank.name)}</p>
+    <div class="rivalsay">${rival.icon} <b>${esc(rival.name)}</b>：${esc(pkLine(win ? "lose" : draw ? "draw" : "win"))}</div>
+    <p style="font-size:14px;opacity:.85;line-height:1.7"><b>+${coin} 🪙</b>${win ? "" : "（输赢都有金币）"}<br>当前段位：${rank.icon} ${esc(rank.name)}</p>
+    ${handicapNote ? `<div class="tiernote down">${handicapNote}</div>` : ""}
     <button class="btn wide" id="again">再来一场</button>
     <button class="btn ghost wide" id="other">换个对手</button></div>`;
-  pkSess = null;
-  $("#again").onclick = () => startPk(rival.id);
+  pkSess = null; clearPkTimers();
+  $("#again").onclick = () => startPk(s.baseId);
   $("#other").onclick = () => { nav = []; S.view = "pk"; render(); };
 }
 
@@ -605,7 +788,7 @@ function duoRound(scr) {
     return;
   }
   const turn = s.i % 2;                       // 0 号玩家先手，之后轮流
-  const skill = s.pool[Math.floor(Math.random() * s.pool.length)], prob = skill.gen();
+  const skill = (s.plan && s.plan[s.i]) || s.pool[Math.floor(Math.random() * s.pool.length)], prob = skill.gen();
   s.cur = { skill, prob };
   $("#title").textContent = "同屏对战";
   scr.innerHTML = `<div class="progress"><i style="width:${s.i / s.n * 100}%"></i></div>
@@ -633,9 +816,9 @@ function duoRound(scr) {
 }
 
 /* ============================================================
- * 🧩 思维乐园（2026-09-02 新增）
- * 原来 55 道思维题分散在 13 个文明站里，没解锁就看不到 —— 思维题不该被锁。
- * 这里把它们全部汇总（按册次分组、按难度筛选），再加 6 个能动手玩的游戏。
+ * 🧩 思维乐园
+ * 55 道思维题全部汇总（不受文明解锁限制），按难度由易到难分组；
+ * 外加 6 个能动手玩的游戏。每道题都走「课本 → 进阶 → 发散」三段。
  * ============================================================ */
 function ALL_CHALLENGES() {
   return CIVS.flatMap(c => ((STATIONS[c.id] || {}).challenge || []).map((ch, i) => ({ ch, civ: c, i })));
@@ -645,34 +828,37 @@ function renderThink(scr) {
   scr.className = "stage"; nav = [];
   const all = ALL_CHALLENGES(), doneN = all.filter(x => S.challengeDone[x.ch.id]).length;
   const filter = S.thinkFilter || "all";
-  const games = THINK_GAMES.map(g => {
+  const games = THINK_GAMES.map(g => {          // THINK_GAMES 在 data.js 里已按由易到难排好
     const n = S.gameWins[g.id] || 0;
     return `<div class="gamecard" data-g="${g.id}"><div class="gi">${g.icon}</div>
-      <div class="gt"><div class="gn">${esc(g.name)}${n ? ` <span class="gdone">通关 ${n} 次 ✓</span>` : ""}</div>
-      <div class="gs">🧠 ${esc(g.think)}</div><div class="gl">${esc(g.link)}</div></div><div class="go">开玩 ›</div></div>`;
+      <div class="gt"><div class="gn">${esc(g.name)} <span class="gstar">${"⭐".repeat(g.star)}</span>${n ? ` <span class="gdone">通关 ${n} 次 ✓</span>` : ""}</div>
+      <div class="gs">🧠 ${esc(g.think)}</div><div class="gl">📘 ${esc(g.link)}</div></div><div class="go">开玩 ›</div></div>`;
   }).join("");
   const match = x => filter === "all" || (filter === "todo" ? !S.challengeDone[x.ch.id] : String(x.ch.star) === filter);
-  const books = [...new Set(CIVS.map(c => c.book))];
-  const groups = books.map(b => {
-    const rows = all.filter(x => x.civ.book === b && match(x));
+  /* ⭐ 由易到难：先按星级分组，组内再按册次先后排 —— 而不是按资料来源（册次）分组。
+     孩子说「有点难」，很大一部分是因为列表第一道就可能是三星题。 */
+  const bookOrder = b => ["三上", "三下", "四上", "四下", "五上", "五下", "六上", "六下"].indexOf(b);
+  const groups = [2, 3].map(star => {
+    const rows = all.filter(x => x.ch.star === star && match(x)).sort((a, b) => bookOrder(a.civ.book) - bookOrder(b.civ.book));
     if (!rows.length) return "";
-    return `<div class="tgroup"><div class="tgh">📘 ${b}</div>${rows.map(x => {
-      const d = S.challengeDone[x.ch.id];
+    const label = star === 2 ? "⭐⭐ 入门 · 想一想就有头绪" : "⭐⭐⭐ 挑战 · 要多绕一个弯";
+    return `<div class="tgroup"><div class="tgh">${label}（${rows.length} 道）</div>${rows.map(x => {
+      const d = S.challengeDone[x.ch.id], L = CHALLENGE_LADDER[x.ch.id];
       return `<button class="trow ${d ? "done" : ""}" data-civ="${x.civ.id}" data-i="${x.i}">
-        <span class="ti">${x.ch.icon}</span><span class="tn">${esc(x.ch.name)}<small>${x.civ.icon} ${esc(x.civ.name)} · ${"⭐".repeat(x.ch.star)}</small></span>
-        <span class="ts">${d ? "已破解 ✓" : "去想想 ›"}</span></button>`;
+        <span class="ti">${x.ch.icon}</span><span class="tn">${esc(x.ch.name)}<small>📘 ${esc(L ? L.unit : x.civ.book)}</small></span>
+        <span class="ts">${S.ladderDone[x.ch.id] ? "三段走完 🌱" : d ? "已破解 ✓" : "去想想 ›"}</span></button>`;
     }).join("")}</div>`;
   }).join("");
-  scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">这里不比谁快</div>动手玩的游戏在上面，动脑想的题在下面。<b>想不出来就看提示</b>，看提示也算解出来。</div></div>
-    <div class="panel"><h3>🎮 动手玩：${THINK_GAMES.length} 个思维游戏</h3>${games}</div>
+  scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">这里不比谁快</div>动手玩的游戏在上面，动脑想的题在下面。<b>都是从易到难排的</b>，从最上面那个开始就行。<div class="soft">想不出来就看提示，看提示也算解出来。</div></div></div>
+    <div class="panel"><h3>🎮 动手玩：${THINK_GAMES.length} 个思维游戏（由易到难）</h3>${games}</div>
     <div class="panel"><h3>🧠 动脑想：${all.length} 道思维题（已破解 ${doneN}）</h3>
       <div class="progress"><i style="width:${all.length ? doneN / all.length * 100 : 0}%"></i></div>
       <div class="tfilter">${[["all", "全部"], ["todo", "还没破解"], ["2", "⭐⭐ 入门"], ["3", "⭐⭐⭐ 挑战"]].map(([k, t]) => `<button class="tf ${filter === k ? "on" : ""}" data-f="${k}">${t}</button>`).join("")}</div>
-      <div class="note">这些题<b>不用先解锁文明</b>，随便点开哪一道都行。</div>
+      <div class="note">每道题都是<b>三段</b>：先做一道课本原型题（确认这一招学过），再挑战进阶，最后发散想一想。<b>不用先解锁文明</b>，随便点开哪一道都行。</div>
       ${groups || '<div class="note">这个筛选下暂时没有题，换一个看看。</div>'}</div>`;
   scr.querySelectorAll(".gamecard").forEach(el => el.onclick = () => go("thinkGame", { game: el.dataset.g }));
   scr.querySelectorAll(".tf").forEach(b => b.onclick = () => { S.thinkFilter = b.dataset.f; save(); renderThink(scr); });
-  scr.querySelectorAll(".trow").forEach(b => b.onclick = () => go("challengeRun", { civ: b.dataset.civ, sub: Number(b.dataset.i) }));
+  scr.querySelectorAll(".trow").forEach(b => b.onclick = () => { chStep = 0; go("challengeRun", { civ: b.dataset.civ, sub: Number(b.dataset.i) }); });
 }
 
 function renderThinkGame(scr) {
@@ -691,6 +877,7 @@ function renderThinkGame(scr) {
 
 /* ---------- 🧩 智能复习：首页级入口，只推荐真正需要回看的内容 ---------- */
 function findSkillStation(skill){return CIVS.find(c=>(STATIONS[c.id]?.core||[]).some(x=>x.id===skill.id));}
+function skillById(id){return ALL_SKILLS().find(s=>s.id===id);}
 function renderReview(scr){
   $("#title").textContent="智能复习";scr.className="stage";nav=[];
   const due=srsDueAll(),weak=weakSkills(),list=[...new Map(due.concat(weak).map(x=>[x.id,x])).values()].slice(0,12);
@@ -702,11 +889,13 @@ function renderReview(scr){
 /* ---------- 📝 阶段测验：按教材册混合抽题，无倒计时 ---------- */
 let examSess=null;
 function bookSkills(book){return CIVS.filter(c=>c.book===book).flatMap(c=>(STATIONS[c.id]||{core:[]}).core);}
+/* 测验按册次考，不按档位筛（要测的是这一册学没学会），但一样从易到难排 */
+function buildExamPlan(pool,n){const out=[];while(out.length<n)out.push(pool[out.length%pool.length]);return sortByLv(out);}
 function renderExam(scr){
   $("#title").textContent="阶段测验"; scr.className="stage";
   if(!examSess){
     scr.innerHTML=`<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">看看哪些本领已经住进脑袋里</div>按人教版数学常用单元整理，每次15题，不倒计时。做错只会生成复习建议，不扣金币。</div></div><div class="qcard"><div class="qmeta"><span>人教版数学 · 选择册次</span><span>15题</span></div><div class="exam-picks">${["三上","三下","四上","四下","五上","五下","六上","六下"].map(b=>`<button class="exam-pick" data-book="${b}">${b}<br><small>${bookSkills(b).length}个知识点</small></button>`).join("")}</div></div>`;
-    scr.querySelectorAll("[data-book]").forEach(b=>b.onclick=()=>{const pool=bookSkills(b.dataset.book);examSess={book:b.dataset.book,i:0,n:15,right:0,wrong:[],cur:null,pool};nextExam(scr);}); return;
+    scr.querySelectorAll("[data-book]").forEach(b=>b.onclick=()=>{const pool=bookSkills(b.dataset.book);examSess={book:b.dataset.book,i:0,n:15,right:0,wrong:[],cur:null,pool,plan:buildExamPlan(pool,15)};nextExam(scr);}); return;
   }
   nextExam(scr);
 }
@@ -718,7 +907,7 @@ function nextExam(scr){
       <div class="note">${weak.length?`建议再看看：${weak.map(esc).join("、")}`:"这一轮全部掌握，可以去思维挑战逛逛。"}</div><button class="btn wide" id="againExam">再测一轮</button><button class="btn ghost wide" id="examBack">返回地图</button></div>`;
     examSess=null; $("#againExam").onclick=()=>renderExam(scr); $("#examBack").onclick=()=>{nav=[];S.view="map";render();}; return;
   }
-  const skill=examSess.pool[(examSess.i*3+Math.floor(Math.random()*examSess.pool.length))%examSess.pool.length],prob=skill.gen();examSess.cur={skill,prob};
+  const skill=(examSess.plan&&examSess.plan[examSess.i])||examSess.pool[examSess.i%examSess.pool.length],prob=skill.gen();examSess.cur={skill,prob};
   scr.innerHTML=`<div class="progress"><i style="width:${examSess.i/examSess.n*100}%"></i></div><div class="qcard"><div class="qmeta"><span>${examSess.book} · ${skill.icon} ${esc(skill.name)}</span><span>${examSess.i+1}/${examSess.n}</span></div><div class="qtext">${prob.q}</div><div class="answerbox"><input id="ans" type="number" inputmode="decimal" placeholder="点这里填写答案" autocomplete="off"><button class="btn" id="ok">确定</button></div>${scratchPadHtml()}<div class="feedback" id="fb"></div></div><button class="btn ghost wide hidden" id="nextb">下一题 ›</button>`;
   bindScratchPad(scr); const input=$("#ans"); const submit=()=>{const v=input.value.trim();if(!v)return;const ok=Number(v)===prob.a;markAttempt(skill.id,ok);if(ok){examSess.right++;markCorrect();}else examSess.wrong.push(skill);const fb=$("#fb");fb.className=`feedback ${ok?"ok":"no"} show`;fb.innerHTML=ok?"答对了，继续探索！":"正确答案是 <b>"+prob.a+"</b>。"+(prob.hint?"<br>"+prob.hint:"");input.disabled=true;$("#ok").classList.add("hidden");$("#nextb").classList.remove("hidden");};
   $("#ok").onclick=submit;input.onkeydown=e=>{if(e.key==="Enter")submit()};$("#nextb").onclick=()=>{examSess.i++;nextExam(scr)};
@@ -759,7 +948,7 @@ function renderParent(scr) {
   const activeDays = Object.keys(S.history).length;
   const recent = Object.keys(S.history).sort().slice(-7).reverse()
     .map(d => `<div class="setrow"><span>${d.slice(5)}</span><b>做对 ${S.history[d].right} 题</b></div>`).join("") || `<div class="note">还没有学习记录。</div>`;
-  const allCore = Object.values(STATIONS).flatMap(s => s.core);
+  const allCore = ALL_SKILLS();
   const mastered = allCore.filter(s => (S.srs[s.id] || {}).lv >= 4).length;
   const weak=weakSkills();
   const fmtSec=n=>n<60?`${Math.round(n)}秒`:`${Math.floor(n/60)}分${Math.round(n%60)}秒`;
@@ -776,16 +965,32 @@ function renderParent(scr) {
     <div class="setrow"><span>有学习记录的天数</span><b>${activeDays}</b></div>
     <div class="setrow"><span>已收集数学奇观</span><b>${Object.keys(S.wonders).length} / ${CIVS.length}</b></div>
     <div class="setrow"><span>课内知识点已熟练</span><b>${mastered} / ${allCore.length}</b></div>
-    <div class="setrow"><span>待复习知识点(到期)</span><b>${srsDueAll().length}</b></div></div>
+    <div class="setrow"><span>待复习知识点(到期)</span><b>${srsDueAll().length}</b></div>
+    <div class="setrow"><span>当前难度档</span><b>${tierInfo().icon} ${esc(tierInfo().name)}（${S.tier}/5）</b></div>
+    <div class="setrow"><span>擂台战绩</span><b>${S.pk.win}胜 ${S.pk.draw}平 ${S.pk.lose}负</b></div></div>
     <div class="panel"><h3>🎯 当前需要关注</h3><div class="note">${weak.length?weak.slice(0,6).map(x=>esc(x.name)).join("、"):"暂时没有连续出错的知识点。"}</div></div>
     <div class="panel"><h3>📝 最近阶段测验</h3>${examRows.length?examRows.map(x=>`<div class="setrow"><span>${x.date} · ${x.book}</span><b>${x.right}/${x.total}</b></div>`).join(""):"<div class='note'>还没有阶段测验记录。</div>"}</div>
     <div class="panel"><h3>🗓️ 最近学习记录</h3>${recent}
     <div class="note">孩子想学就学，这里只默默记录她每天做对了多少，供您了解进度——不设连续打卡，避免压力。</div></div>
+    <div class="panel"><h3>📏 难度档位</h3>
+    <div class="setrow"><span>当前难度<br><span class="note">${tierInfo().icon} ${esc(tierInfo().name)} —— ${esc(tierInfo().blurb)}</span></span><b>${S.tier} / 5</b></div>
+    <div class="tierpick">${TIERS.map(t=>`<button class="tierbtn ${S.tier===t.n?"on":""}" data-tier="${t.n}">${t.icon}<br>${esc(t.name)}</button>`).join("")}</div>
+    <div class="setrow"><span>自动调难度<br><span class="note">一轮答对 85% 以上升一档，低于 45% 降一档。锁定后只按您选的档位出题。</span></span>
+      <div class="seg"><button id="tl1" class="${S.tierLock ? "on" : ""}">锁定</button><button id="tl0" class="${!S.tierLock ? "on" : ""}">自动</button></div></div>
+    ${S.tierLog.length?`<div class="note">最近调档：${S.tierLog.slice(-5).reverse().map(x=>`${x.date.slice(5)} → 第${x.to}档（正确率${x.rate}%）`).join("；")}</div>`:'<div class="note">还没有调过档。</div>'}
+    </div>
+    <div class="panel"><h3>⚔️ 关于 PK 擂台</h3>
+    <p class="note">擂台上的猫小九、麦克狐、猴子警长是<b>程序模拟的对手</b>，不是联网真人 —— 只是给了名字、说话的口气和会算错的毛病，让对战有意思一点。<br>
+    孩子连输两场，对手会自动变慢、变得更容易出错；连赢三场再调回来。当前让分档：<b>${S.pk.handicap||0}</b>（负数＝对手已放水）。<br>
+    计分是<b>答对 12 分、先交卷只多 4 分</b>，所以算得慢但算得对一样能赢。</p></div>
     <div class="panel"><h3>⚙️ 设置</h3>
     <div class="setrow"><span>测试模式<br><span class="note">解锁全部文明，方便您预览。给孩子用前请关掉。</span></span>
       <div class="seg"><button id="tm0" class="${!S.testMode ? "on" : ""}">关</button><button id="tm1" class="${S.testMode ? "on" : ""}">开</button></div></div>
     </div>
     <div class="panel"><h3>ℹ️ 设计说明</h3><p class="note">数学奇境用于保持兴趣并自然拓展：课本知识练熟后，继续接触数学史、生活数学与思维方法。这里不设每日任务和连续打卡，孩子随时想来都可以。金币和转盘券与语文、英语互通。</p></div>`;
+  scr.querySelectorAll("[data-tier]").forEach(b=>b.onclick=()=>{S.tier=Number(b.dataset.tier);save();renderParent(scr);});
+  $("#tl1").onclick = () => { S.tierLock = true; save(); renderParent(scr); };
+  $("#tl0").onclick = () => { S.tierLock = false; save(); renderParent(scr); };
   $("#tm0").onclick = () => { S.testMode = false; CIVS.forEach(c => { if (c.locked) delete S.unlocked[c.id]; }); save(); renderParent(scr); };
   $("#tm1").onclick = () => { S.testMode = true; CIVS.forEach(c => S.unlocked[c.id] = true); save(); renderParent(scr); };
   $("#parentBackMath").onclick = () => { S.view="map"; nav=[]; render(); };

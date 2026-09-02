@@ -1,6 +1,6 @@
 /* 数学奇境 Service Worker —— 每次发版必须 bump CACHE 版本号 */
-const CACHE = "mathquest-v17";
-const ASSETS = ["./", "./index.html", "./data.js", "./games.js", "./app.js", "./manifest.json", "./assets/baibai-base.png"];
+const CACHE = "mathquest-v19";
+const ASSETS = ["./", "./index.html", "./data.js", "./ladder.js", "./games.js", "./app.js", "./manifest.json", "./assets/baibai-base.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", e => {

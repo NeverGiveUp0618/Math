@@ -14,13 +14,19 @@ const MathGames = (() => {
   const rnd = n => Math.floor(Math.random() * n);
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const el = (html) => { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstElementChild; };
-  const head = (g, extra) => `<div class="gm-head"><div class="gm-ico">${g.icon}</div><div><div class="gm-nm">${g.name}</div><div class="gm-th">🧠 练的是：${g.think}</div></div></div>
-    <div class="gm-how">${g.how}<div class="gm-link">📘 对应课本：${g.link}</div></div>${extra || ""}`;
+  const head = (g, extra) => `<div class="gm-head"><div class="gm-ico">${g.icon}</div><div><div class="gm-nm">${g.name} ${"⭐".repeat(g.star || 1)}</div><div class="gm-th">🧠 练的是：${g.think}</div></div></div>
+    <div class="gm-how">${g.how}
+      <div class="gm-ladder">
+        <div><b>📘 靠着课本</b>${g.link}${g.point ? " · " + g.point : ""}</div>
+        ${g.up ? `<div><b>🧠 再进一步</b>${g.up}</div>` : ""}
+        ${g.out ? `<div><b>🌱 想远一点</b>${g.out}</div>` : ""}
+      </div></div>${extra || ""}`;
 
   /* ==========================================================
    * 🃏 算 24 点
    * ========================================================== */
-  function solve24(nums) {                      // 返回一个解的字符串，无解返回 null
+  /* 返回一个解的字符串，无解返回 null。noDiv=true 时只用 + − ×（入门档） */
+  function solve24(nums, noDiv) {
     const start = nums.map(n => ({ v: n, s: String(n) }));
     const walk = list => {
       if (list.length === 1) return Math.abs(list[0].v - 24) < EPS ? list[0].s : null;
@@ -32,30 +38,33 @@ const MathGames = (() => {
           { v: a.v * b.v, s: `(${a.s}×${b.s})` },
           { v: a.v - b.v, s: `(${a.s}−${b.s})` }
         ];
-        if (Math.abs(b.v) > EPS) cand.push({ v: a.v / b.v, s: `(${a.s}÷${b.s})` });
+        if (!noDiv && Math.abs(b.v) > EPS) cand.push({ v: a.v / b.v, s: `(${a.s}÷${b.s})` });
         for (const c of cand) { const r = walk(rest.concat(c)); if (r) return r; }
       }
       return null;
     };
     return walk(start);
   }
-  function deal24() {                            // 只发有解的牌，且不要太离谱
-    for (let t = 0; t < 400; t++) {
-      const nums = [1, 2, 3, 4].map(() => 1 + rnd(10));
-      const sol = solve24(nums);
-      if (sol) return { nums, sol };
+  /* 只发有解的牌。入门档还要求「不用除法也解得开」，并且数字都不大。 */
+  function deal24(easy) {
+    const hi = easy ? 9 : 10;
+    for (let t = 0; t < 600; t++) {
+      const nums = [1, 2, 3, 4].map(() => 1 + rnd(hi));
+      const sol = solve24(nums, easy);
+      if (sol) return { nums, sol, easy };
     }
-    return { nums: [4, 6, 2, 3], sol: solve24([4, 6, 2, 3]) };
+    return { nums: [4, 6, 2, 3], sol: solve24([4, 6, 2, 3], easy), easy };
   }
   const g24 = {
     render(host, api) {
       const g = THINK_GAMES.find(x => x.id === "g24");
-      let round = null;
-      const deal = () => { round = deal24(); round.used = [false, false, false, false]; round.expr = []; paint(); };
+      let round = null, easy = true;            // 默认入门档：一定存在只用 + − × 的解
+      const deal = () => { round = deal24(easy); round.used = [false, false, false, false]; round.expr = []; paint(); };
       const exprText = () => round.expr.map(t => t.t).join(" ");
       function paint(msg, cls) {
         host.innerHTML = head(g) + `
           <div class="gm-board">
+            <div class="hn-pick"><button class="hn-lv ${easy ? "on" : ""}" data-easy="1">入门 · 只用 ＋−×</button><button class="hn-lv ${easy ? "" : "on"}" data-easy="0">标准 · 可能要用 ÷</button></div>
             <div class="g24-cards">${round.nums.map((n, i) => `<button class="g24-card ${round.used[i] ? "used" : ""}" data-n="${i}">${n}</button>`).join("")}</div>
             <div class="g24-expr" id="g24expr">${exprText() ? api.esc(exprText()) : '<span class="ph">点上面的数字和下面的符号，拼出一个算式</span>'}</div>
             <div class="g24-keys">
@@ -76,6 +85,7 @@ const MathGames = (() => {
         host.querySelector("[data-act='del']").onclick = () => { const t = round.expr.pop(); if (t && t.card !== undefined) round.used[t.card] = false; paint(); };
         host.querySelector("[data-act='clr']").onclick = () => { round.expr = []; round.used = [false, false, false, false]; paint(); };
         host.querySelector("[data-act='new']").onclick = deal;
+        host.querySelectorAll("[data-easy]").forEach(b => b.onclick = () => { easy = b.dataset.easy === "1"; deal(); });
         host.querySelector("[data-act='hint']").onclick = () => {
           const first = round.sol.match(/\(([\d.]+)([+−×÷])([\d.]+)\)/);
           paint(first ? `白白偷偷告诉你：可以先算 <b>${first[1]} ${first[2]} ${first[3]}</b>，再想剩下的两个数怎么办。<br><span style="opacity:.75">这组一定有解，别放弃～</span>`

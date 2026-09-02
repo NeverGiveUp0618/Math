@@ -9,6 +9,7 @@ const dir = path.join(__dirname, "..");
 let html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
 html = html.replace(/<script src="[^"]+"><\/script>/g, ""); // 去掉外链脚本，改为手动注入
 const dataJs = fs.readFileSync(path.join(dir, "data.js"), "utf8");
+const ladderJs = fs.readFileSync(path.join(dir, "ladder.js"), "utf8");
 const gamesJs = fs.readFileSync(path.join(dir, "games.js"), "utf8");
 const appJs = fs.readFileSync(path.join(dir, "app.js"), "utf8");
 
@@ -17,6 +18,7 @@ const { window } = dom;
 window.HTMLElement.prototype.focus = function () {};
 function inject(code) { const s = window.document.createElement("script"); s.textContent = code; window.document.body.appendChild(s); }
 inject(dataJs);   // 用真正的 <script> 注入，全局词法环境共享，后续 window.eval 才能读到 CIVS/S
+inject(ladderJs);
 inject(gamesJs);
 inject(appJs);
 
@@ -95,14 +97,43 @@ ok("拓展一轮能跑完不报错", $("#screen").innerHTML.includes("做对"));
 console.log("— 思维挑战：小高斯配对求和 —");
 window.eval("sess=null; nav=[]; S.view='challenge'; render();");
 ok("挑战列表出现", $("#screen").innerHTML.includes("金字塔数塔"));
-window.eval("nav=[]; S.view='challengeRun'; S.sub=1; render();"); // index1 = 小高斯 答案55
-ok("挑战题渲染", $("#screen").innerHTML.includes("高斯"));
+window.eval("chStep=0; nav=[]; S.view='challengeRun'; S.sub=1; render();"); // index1 = 小高斯 答案55
+ok("★ 第一段先给「课本这一招」，而不是直接上奥数题", !!$(".ladderbar") && $("#screen").textContent.includes("课本这一招") && !!$(".anchortag"));
+ok("★ 明确写出靠在哪一册哪个单元", $(".qmeta").textContent.includes("三上"));
+ok("★ 也写清了用的是课本上的哪一招", $(".anchortag").textContent.includes("凑整相加"));
+ok("第一段可以跳过（会了就直接挑战）", !!$("#skip"));
+$("#ans").value = String(window.eval("CHALLENGE_LADDER.eg_gauss.anchor.a"));
+click($("#ok"));
+ok("课本原型题答对给讲解", $("#fb").classList.contains("ok") && $("#fb").textContent.includes("每一对都是 11"));
+click($("#goMain"));
+ok("第二段才是进阶挑战题", $("#screen").innerHTML.includes("高斯"));
+ok("第二段标出「同一招再往前一步」", $(".anchortag").textContent.includes("同一招"));
 click($("#hintBtn"));
 ok("能逐条看思路", $(".hint"));
 $("#ans").value = "55";
 click($("#ok"));
 ok("答对显示解题大招", !$("#big").classList.contains("hidden"));
 ok("挑战奖励金币入账", window.eval("S.challengeDone.eg_gauss === true"));
+click($("#doneb"));
+ok("★ 第三段是发散追问，且不判对错", $("#screen").textContent.includes("再想远一点") && !!$("#showIdea") && !$("#ans"));
+ok("发散题写明想得不一样也很好", $(".outnote").textContent.includes("不一样也很好"));
+click($("#showIdea"));
+ok("★ 看完白白的想法才算走完三段", !$("#idea").classList.contains("hidden") && window.eval("S.ladderDone.eg_gauss") === true);
+
+console.log("— 📘 三段阶梯的覆盖率与合法性 —");
+ok("★ 55 道思维题全部配了教材锚点", window.eval(`CIVS.flatMap(c=>(STATIONS[c.id]||{challenge:[]}).challenge).every(ch=>!!CHALLENGE_LADDER[ch.id])`));
+ok("阶梯没有多余条目", window.eval(`Object.keys(CHALLENGE_LADDER).every(k=>CIVS.some(c=>(STATIONS[c.id]||{challenge:[]}).challenge.some(ch=>ch.id===k)))`));
+const ladderErrs = window.eval(`(function(){const e=[];
+  for(const [id,L] of Object.entries(CHALLENGE_LADDER)){
+    if(!L.unit||!L.point) e.push(id+" 缺 unit/point");
+    if(!L.anchor||!L.anchor.q||typeof L.anchor.a!=="number"||!L.anchor.why) e.push(id+" anchor 不完整");
+    else if(Math.round(L.anchor.a*100)/100!==L.anchor.a) e.push(id+" anchor 答案有浮点尾巴");
+    if(!L.out||!L.out.q||!L.out.idea) e.push(id+" 发散题不完整");
+  } return e;})()`);
+ok("★ 每条阶梯的三段都完整、原型题答案能严格判对", ladderErrs.length === 0);
+if (ladderErrs.length) ladderErrs.forEach(x => console.log("    · " + x));
+ok("教材出处都写到了册次", window.eval(`Object.values(CHALLENGE_LADDER).every(L=>/[三四五六][上下]/.test(L.unit))`));
+ok("★ 六个思维游戏也标了课本锚点和进阶/发散", window.eval("THINK_GAMES.every(g=>g.link&&g.point&&g.up&&g.out)"));
 
 console.log("— 阶段测验与个性化 —");
 window.eval("examSess=null; nav=[]; S.view='exam'; render();");
@@ -180,11 +211,18 @@ ok("擂台有段位卡", !!$(".rankcard"));
 ok("擂台提供三个对手", window.document.querySelectorAll(".rival").length === 3);
 ok("擂台有同屏双人入口", !!$("#duoBtn"));
 ok("擂台明说输了也有金币", $("#screen").textContent.includes("输了也有金币"));
-ok("擂台出题范围含综合与八册", window.document.querySelectorAll("#screen [data-book]").length === 9);
+ok("★ 擂台明说答对是大头、慢也能赢", $("#screen").textContent.includes("算得慢但算得对"));
+ok("擂台出题范围含「适合我」「热身」与八册", window.document.querySelectorAll("#screen [data-book]").length === 10 && $("#screen").textContent.includes("适合我") && $("#screen").textContent.includes("热身"));
+ok("★ 对手写明大概多少秒交一题（不再是黑箱）", !!$(".rival .sp"));
+ok("★ 最容易的对手至少 20 秒才交卷（原来 9 秒等于必输）", window.eval("PK_RIVALS[0].fast") >= 20000);
+ok("★ 对手是用户指定的三个角色", window.eval("PK_RIVALS.map(r=>r.name).join(',')") === "猫小九,麦克狐,猴子警长");
+ok("★ 最快的对手也不会 9 秒内交卷", window.eval("PK_RIVALS.every(r=>r.fast>=9000)"));
+ok("★ 对手不是「机器」口吻", window.eval("PK_RIVALS.every(r=>!/机器|电脑|AI|机器人/.test(r.name+r.title+r.blurb))"));
 const pkCoin0 = window.eval("S.coins"), pkPlays0 = window.eval("S.pk.plays");
-click($(".rival[data-r='chick']"));
+click($(".rival[data-r='mao']"));
 ok("进入擂台对战页并显示比分条", !!$(".pkbar") && window.eval("S.view") === "pkRun");
-ok("对战页显示对手正在算", !!$("#rvthink"));
+ok("对战页显示对手正在读题", !!$("#rvthink") && $("#rvthink").textContent.includes("读题"));
+ok("★ 开局对手会打招呼（像个人）", !!$(".rivalsay"));
 let pkGuard = 0;
 while ($("#ans") && pkGuard++ < 20) {
   $("#ans").value = String(window.eval("pkSess.cur.prob.a"));
@@ -192,7 +230,8 @@ while ($("#ans") && pkGuard++ < 20) {
   if ($("#nextb") && !$("#nextb").classList.contains("hidden")) click($("#nextb"));
 }
 ok("八题打完出结算", $("#screen").innerHTML.includes("擂台") || !!$(".pkscore"));
-ok("全对必胜（10~15分/题 vs 对手最多10分）", window.eval("S.pk.win") >= 1);
+ok("★ 全对必胜：答对12分＋速度4分，对手每题最多16分但他不可能全对", window.eval("S.pk.win") >= 1);
+ok("★ 每题结算都有对手的一句话", window.eval("S.pk.rounds") >= 8);
 ok("战绩已记账", window.eval("S.pk.plays") === pkPlays0 + 1);
 ok("对战结束发金币", window.eval("S.coins") > pkCoin0);
 ok("段位随胜场提升", window.eval("pkRank().name") !== undefined);
@@ -221,7 +260,7 @@ ok("筛选⭐⭐⭐后只剩三星题", window.document.querySelectorAll(".trow"
 click(window.document.querySelectorAll(".tf")[0]);
 const firstRow = window.document.querySelector(".trow");
 click(firstRow);
-ok("从思维乐园能直接打开思维题", window.eval("S.view") === "challengeRun" && !!$("#hintBtn"));
+ok("从思维乐园能直接打开思维题，并且从第一段开始", window.eval("S.view") === "challengeRun" && !!$(".ladderbar") && window.eval("chStep") === 0);
 
 console.log("— 🎮 六个思维游戏 —");
 const g = window.eval("MathGames");
@@ -264,6 +303,59 @@ for (const step of RIVER_STEPS) {
 }
 ok("七趟标准解法能通关", $("#screen").textContent.includes("全部安全过河") || $("#screen").textContent.includes("全部过河"));
 ok("通关计入思维游戏记录", window.eval("(S.gameWins.river||0) >= 1"));
+
+
+console.log("— 📏 难度梯度 —");
+ok("难度五档齐全", window.eval("TIERS.length") === 5);
+ok("★ 默认从最低档起（孩子反馈「有点难」）", window.eval("defState().tier") === 1);
+ok("87 个知识点全部标了难度", window.eval("CIVS.flatMap(c=>(STATIONS[c.id]||{core:[]}).core).every(s=>SKILL_LV[s.id]>=1&&SKILL_LV[s.id]<=5)"));
+ok("★ 新增 6 个热身口算，全是难度 1", window.eval("WARMUP_SKILLS.length===6 && WARMUP_SKILLS.every(s=>s.lv===1)"));
+ok("热身口算出题合法且无浮点尾巴", window.eval(`(function(){for(const s of WARMUP_SKILLS){for(let i=0;i<200;i++){const p=s.gen();
+  if(typeof p.a!=="number"||!isFinite(p.a)||p.a<0)return false;
+  if(Math.round(p.a*100)/100!==p.a)return false;}}return true})()`));
+ok("★ 低档位只出得到低难度题", window.eval("poolForTier(CIVS.flatMap(c=>(STATIONS[c.id]||{core:[]}).core),1).every(s=>skillLv(s)<=1)"));
+ok("★ 档位不够时退而取最简单的一半，不会出现空池", window.eval("poolForTier(STATIONS.future.core,1).length>=3 && poolForTier(STATIONS.future.core,1).every(s=>skillLv(s)<=5)"));
+ok("一轮的出题计划是从易到难排的", window.eval(`(function(){const p=buildPlan(CIVS.flatMap(c=>(STATIONS[c.id]||{core:[]}).core),8);
+  for(let i=1;i<p.length;i++) if(skillLv(p[i])<skillLv(p[i-1])) return false; return true})()`));
+ok("阶段测验也从易到难排", window.eval(`(function(){const p=buildExamPlan(bookSkills("六下"),15);
+  for(let i=1;i<p.length;i++) if(skillLv(p[i])<skillLv(p[i-1])) return false; return true})()`));
+window.eval("S.tier=3; S.tierLock=false; S.tierLog=[];");
+ok("★ 一轮答对 85% 以上自动升档", window.eval("adjustTier(7,8)") === "up" && window.eval("S.tier") === 4);
+ok("★ 一轮答对不到 45% 自动降档", window.eval("adjustTier(3,8)") === "down" && window.eval("S.tier") === 3);
+ok("中间成绩不动档", window.eval("adjustTier(5,8)") === null && window.eval("S.tier") === 3);
+window.eval("S.tierLock=true;");
+ok("★ 家长锁定后不再自动调", window.eval("adjustTier(8,8)") === null && window.eval("S.tier") === 3);
+window.eval("S.tierLock=false; S.tier=5;");
+ok("到顶不再升", window.eval("adjustTier(8,8)") === null);
+window.eval("S.tier=1;");
+ok("到底不再降", window.eval("adjustTier(0,8)") === null);
+ok("调档记录进了家长后台", window.eval("S.tierLog.length") > 0);
+
+console.log("— 🌱 热身口算入口 —");
+window.eval("S.tier=1; sess=null; nav=[]; S.view='map'; render();");
+ok("首页有热身口算按钮和难度提示", !!$("#warmBtn") && !!$(".tierchip"));
+click($("#warmBtn"));
+ok("热身口算能开练", window.eval("S.civ") === "warmup" && !!$("#ans"));
+ok("★ 热身题目难度标记是最低档", $(".qmeta").textContent.includes("◆◇◇◇◇"));
+let wg = 0;
+while ($("#ans") && wg++ < 12) { $("#ans").value = String(window.eval("sess.cur.prob.a")); click($("#ok")); if ($("#nextb") && !$("#nextb").classList.contains("hidden")) click($("#nextb")); }
+ok("热身一轮跑完并结算", $("#screen").innerHTML.includes("这一轮做对"));
+ok("★ 热身全对后自动升档", window.eval("S.tier") >= 2);
+ok("★ 结算页会说清难度调到哪儿了", !!$(".tiernote"));
+
+console.log("— 🧩 思维乐园：由易到难 —");
+window.eval("nav=[]; S.view='think'; render();");
+ok("★ 思维游戏按难度排，最容易的排第一", window.eval("THINK_GAMES[0].star") === 1 && window.eval("THINK_GAMES[THINK_GAMES.length-1].star") === 3);
+ok("每个游戏都标了难度星", window.document.querySelectorAll(".gamecard .gstar").length === 6);
+ok("★ 思维题改成按难度分组（入门在前，挑战在后）",
+  $("#screen").innerHTML.indexOf("⭐⭐ 入门") < $("#screen").innerHTML.indexOf("⭐⭐⭐ 挑战"));
+ok("入门组的题都是两星", window.eval(`(function(){const html=document.querySelector("#screen").innerHTML;
+  const i=html.indexOf("⭐⭐ 入门"), j=html.indexOf("⭐⭐⭐ 挑战"); return i>=0&&j>i})()`));
+ok("★ 24点分了入门/标准两档", window.eval(`(function(){nav=[];S.view='thinkGame';S.game='g24';render();
+  return document.querySelectorAll("[data-easy]").length===2})()`));
+ok("入门档 24 点保证不用除法就能解", window.eval(`(function(){for(let i=0;i<40;i++){
+  const n=[1,2,3,4].map(()=>1+Math.floor(Math.random()*9)); const s=MathGames.solve24(n,true);
+  if(s&&/÷/.test(s))return false;}return true})()`));
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);
