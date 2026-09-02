@@ -357,5 +357,62 @@ ok("入门档 24 点保证不用除法就能解", window.eval(`(function(){for(l
   const n=[1,2,3,4].map(()=>1+Math.floor(Math.random()*9)); const s=MathGames.solve24(n,true);
   if(s&&/÷/.test(s))return false;}return true})()`));
 
+
+console.log("— 🪙 奖励对接对账（新板块有没有接上奖励规则）—");
+/* timeLog 的键是视图名；白名单漏一个，家长后台的学习时长就静静地少算。 */
+const allViews = [...window.eval("String(render)").matchAll(/S\.view === "(\w+)"/g)].map(m => m[1]).filter(v => v !== "parent");
+ok("★ 家长后台的时长白名单覆盖了全部学习视图", allViews.every(v => window.eval("STUDY_VIEWS").includes(v)));
+ok("★ PK 和思维乐园的时间会被算进有效学习", window.eval(`["pk","pkRun","think","thinkGame"].every(v=>STUDY_VIEWS.includes(v))`));
+ok("家长后台不把家长页算成学习时间", !window.eval("STUDY_VIEWS").includes("parent"));
+
+/* 金币：每一个「答对」的入口都要走 markCorrect，否则每日5题奖励/白白卡都不会触发 */
+ok("★ 课内、拓展、测验、PK、思维游戏、课本原型题都调用了 markCorrect",
+  window.eval(`[String(nextCore),String(nextExtend),String(nextExam),String(renderPkRun),String(renderThinkGame),String(renderChAnchor)].every(f=>/markCorrect\(\)/.test(f))`));
+ok("★ 思维游戏的金币走的是统一入口（addCoins + markCorrect）",
+  window.eval(`/coin:[^,]*addCoins\\(n\\)[\\s\\S]{0,40}markCorrect\\(\\)/.test(String(renderThinkGame))`));
+
+/* 转盘券：本站规矩是「靠成就发，不靠打卡」，新板块也要有成就出口 */
+window.eval("S.pk.win=2;S.pk.rankAt=0;S.pk.streakWin=0;S.pk.streakLose=0;S.pk.handicap=0;S.tier=1;S.pkBook='🌱 热身';");
+const tk0 = window.eval("S.tickets");
+window.eval("pkSess=null;nav=[];S.view='pk';render();");
+click($(".rival[data-r='mao']"));
+let rg = 0;
+while ($("#ans") && rg++ < 20) {
+  $("#ans").value = String(window.eval("pkSess.cur.prob.a"));
+  click($("#ok"));
+  if ($("#nextb") && !$("#nextb").classList.contains("hidden")) click($("#nextb"));
+}
+ok("★ 擂台段位晋级发 1 张转盘券", window.eval("S.tickets") === tk0 + 1 && window.eval("S.pk.rankAt") === 3);
+ok("晋级提示写进了结算页", $("#screen").textContent.includes("晋级"));
+window.eval("pkSess=null;S.pk.win=9;S.pk.rankAt=8;nav=[];S.view='pk';render();");
+const tk1 = window.eval("S.tickets");
+click($(".rival[data-r='mao']"));
+rg = 0;
+while ($("#ans") && rg++ < 20) { $("#ans").value = "-99999"; click($("#ok")); if ($("#nextb") && !$("#nextb").classList.contains("hidden")) click($("#nextb")); }
+ok("★ 没晋级就不重复发券", window.eval("S.tickets") === tk1);
+
+window.eval("S.gameWins={g24:1,magic:1,hanoi:1,sudoku:1,weigh:1};S.gameAllTicket=false;");
+const tk2 = window.eval("S.tickets");
+window.eval("nav=[]; S.view='thinkGame'; S.game='river'; render();");
+for (const step of ["sheep", null, "wolf", "sheep", "cabbage", null, "sheep"]) {
+  const btn = step ? window.document.querySelector(`.rv-item[data-id='${step}']:not([disabled])`) : window.document.querySelector("[data-act='alone']");
+  if (btn) click(btn);
+}
+ok("★ 六个思维游戏全通关送 2 张转盘券", window.eval("S.tickets") === tk2 + 2 && window.eval("S.gameAllTicket") === true);
+window.eval("nav=[]; S.view='thinkGame'; S.game='river'; render();");
+const tk3 = window.eval("S.tickets");
+for (const step of ["sheep", null, "wolf", "sheep", "cabbage", null, "sheep"]) {
+  const btn = step ? window.document.querySelector(`.rv-item[data-id='${step}']:not([disabled])`) : window.document.querySelector("[data-act='alone']");
+  if (btn) click(btn);
+}
+ok("全通关奖励只发一次", window.eval("S.tickets") === tk3);
+
+/* 收藏页要看得见新板块的成果，否则奖励发了也没处兑现成就感 */
+window.eval("nav=[]; S.view='rewards'; render();");
+ok("★ 宝库展示擂台战绩", $("#screen").textContent.includes("擂台战绩") && $("#screen").textContent.includes("段位"));
+ok("★ 宝库展示六个思维游戏的通关情况", window.document.querySelectorAll(".gamewins .gw").length === 6 && window.document.querySelectorAll(".gamewins .gw.got").length === 6);
+ok("★ 宝库展示思维题破解数与三段阶梯", $("#screen").textContent.includes("破解的思维题") && $("#screen").textContent.includes("走完三段阶梯"));
+ok("宝库显示当前难度档", $("#screen").textContent.includes("当前难度档"));
+
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

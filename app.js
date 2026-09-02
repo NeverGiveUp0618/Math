@@ -36,6 +36,7 @@ function defState() {
     tierLog: [],            // 最近几次调档记录，家长后台看得见
     pk: { win:0, lose:0, draw:0, plays:0, rounds:0, roundWin:0, duo:0, handicap:0, streakWin:0, streakLose:0 },  // ⚔️ 擂台战绩（只累加，不掉段）
     gameWins: {},           // 🧩 思维游戏 id -> 通关次数
+    gameAllTicket: false,   // 六个思维游戏全通关的转盘券（只发一次）
     ladderDone: {},         // 🌱 走完「课本→进阶→发散」三段的思维题
     testMode: false
   };
@@ -44,7 +45,7 @@ let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
 S.daily = Object.assign({ date: todayStr(), correct: 0 }, S.daily);
 S.attempts = S.attempts || {}; S.timeLog = S.timeLog || {}; S.exams = S.exams || {}; S.scratchDrafts = S.scratchDrafts || {};
-S.pk = Object.assign({ win:0, lose:0, draw:0, plays:0, rounds:0, roundWin:0, duo:0, handicap:0, streakWin:0, streakLose:0 }, S.pk); S.gameWins = S.gameWins || {}; S.ladderDone = S.ladderDone || {};
+S.pk = Object.assign({ win:0, lose:0, draw:0, plays:0, rounds:0, roundWin:0, duo:0, handicap:0, streakWin:0, streakLose:0, rankAt:0 }, S.pk); S.gameWins = S.gameWins || {}; S.ladderDone = S.ladderDone || {};
 S.tier = Math.min(5, Math.max(1, Number(S.tier) || 1)); S.tierLog = Array.isArray(S.tierLog) ? S.tierLog : [];
 if (S.daily.date !== todayStr()) S.daily = { date: todayStr(), correct: 0 };
 
@@ -197,6 +198,11 @@ function petBody(){const b=String(loadSharedPet().body||"");return /^https:\/\/n
 function safeNum(v,d,min,max){v=Number(v);return Number.isFinite(v)?Math.max(min,Math.min(max,v)):d;}
 function baibaiAvatar(cls){const p=loadSharedPet(),layers=(p.items||[]).slice(0,20).map(it=>{const art=String(it.art||""),safe=/^https:\/\/nevergiveup0618\.github\.io\/English\/assets\/outfits\/[a-z0-9-]+\.(?:svg|webp)$/.test(art),x=safeNum(it.x,50,0,100),y=safeNum(it.y,50,0,100),s=safeNum(it.s,1,.3,3),r=safeNum(it.r,0,-360,360),base=safeNum(it.base,.3,.2,1.2);return `<span class="pet-layer" style="left:${x}%;top:${y}%;width:${Math.round(base*s*100)}%;transform:translate(-50%,-50%) rotate(${r}deg)">${safe?`<img src="${art}" alt="">`:esc(it.e||"")}</span>`}).join("");return `<span class="math-baibai ${cls||""}"><img class="pet-body" src="${petBody()}" alt="白白">${layers}</span>`;}
 
+/* ⚠️ timeLog 的键是「视图名」（trackTime 存的是 S.view）。
+   这份白名单一旦漏了新视图，家长后台的有效学习时长就会静静地少算 ——
+   2026-09-02 查出 station/challengeRun/review/pk/pkRun/think/thinkGame 全漏了。
+   加新视图时必须同步这里，smoke 有断言守着。 */
+const STUDY_VIEWS = ["map","station","core","extend","challenge","challengeRun","review","exam","rewards","pk","pkRun","think","thinkGame"];
 let activeModule="map", activeAt=Date.now();
 let journeyScreen="",journeyAt=Date.now();
 function flushJourney(){if(!journeyScreen)return;const seconds=Math.min(1800,Math.round((Date.now()-journeyAt)/1000));if(seconds<2)return;try{const rows=JSON.parse(localStorage.getItem(JOURNEY_KEY)||"[]");rows.push({subject:"ma",screen:journeyScreen,day:todayStr(),seconds,at:Date.now()});localStorage.setItem(JOURNEY_KEY,JSON.stringify(rows.slice(-500)));}catch(e){}journeyAt=Date.now();}
@@ -754,15 +760,19 @@ function pkDone(scr) {
   if (S.pk.streakLose >= 2 && (S.pk.handicap || 0) > -2) { S.pk.handicap = (S.pk.handicap || 0) - 1; S.pk.streakLose = 0; handicapNote = `下一场${esc(rival.name)}会慢一点、也更容易算错 —— 白白偷偷帮你说好了。`; }
   if (S.pk.streakWin >= 3 && (S.pk.handicap || 0) < 1) { S.pk.handicap = (S.pk.handicap || 0) + 1; S.pk.streakWin = 0; handicapNote = `你连赢三场，${esc(rival.name)}要拿出真本事了。`; }
   const coin = win ? rival.coin : draw ? Math.round(rival.coin * .7) : Math.round(rival.coin * .5);
-  addCoins(coin); save();
+  addCoins(coin);
   const rank = pkRank();
+  /* 转盘券在本站只靠「成就」发（不靠打卡）—— 段位晋级就是擂台的成就 */
+  let rankUp = "";
+  if (rank.at > (S.pk.rankAt || 0)) { S.pk.rankAt = rank.at; addTickets(1); rankUp = `晋级「${esc(rank.name)}」${rank.icon}　<b>+1 🎡</b>`; }
+  save();
   $("#title").textContent = "擂台结果";
   scr.innerHTML = `<div class="qcard" style="text-align:center">
     <div style="font-size:52px">${win ? "🏆" : draw ? "🤝" : "💪"}</div>
     <div class="qtext">${win ? "赢了这一场！" : draw ? "打成平手！" : "这场惜败"}</div>
     <div class="pkscore"><div><b>${s.me}</b><small>我</small></div><div class="vs">:</div><div><b>${s.rv}</b><small>${esc(rival.name)}</small></div></div>
     <div class="rivalsay">${rival.icon} <b>${esc(rival.name)}</b>：${esc(pkLine(win ? "lose" : draw ? "draw" : "win"))}</div>
-    <p style="font-size:14px;opacity:.85;line-height:1.7"><b>+${coin} 🪙</b>${win ? "" : "（输赢都有金币）"}<br>当前段位：${rank.icon} ${esc(rank.name)}</p>
+    <p style="font-size:14px;opacity:.85;line-height:1.7"><b>+${coin} 🪙</b>${win ? "" : "（输赢都有金币）"}<br>当前段位：${rank.icon} ${esc(rank.name)}${rankUp ? `<br>${rankUp}` : ""}</p>
     ${handicapNote ? `<div class="tiernote down">${handicapNote}</div>` : ""}
     <button class="btn wide" id="again">再来一场</button>
     <button class="btn ghost wide" id="other">换个对手</button></div>`;
@@ -869,7 +879,13 @@ function renderThinkGame(scr) {
   MathGames[g.id].render(scr, {
     esc, toast,
     coin: n => { addCoins(n); markCorrect(); },
-    win: id => { S.gameWins[id] = (S.gameWins[id] || 0) + 1; save(); if (Object.keys(S.gameWins).length === THINK_GAMES.length) toast("🎉 六个思维游戏你都通关过了！"); },
+    win: id => {
+      S.gameWins[id] = (S.gameWins[id] || 0) + 1; save();
+      if (THINK_GAMES.every(g => S.gameWins[g.id]) && !S.gameAllTicket) {
+        S.gameAllTicket = true; addTickets(2); save();
+        toast("🎉 六个思维游戏全部通关！+2 🎡");
+      }
+    },
     back: () => back(),
     isWon: id => !!S.gameWins[id]
   });
@@ -924,7 +940,14 @@ function renderRewards(scr) {
     <div class="panel"><h3>🏺 数学奇观收藏</h3><div class="wondergrid">${wonders}</div>
       <div class="note">集齐一个文明的三颗探险星（课内 + 拓展 + 思维）就能点亮它的奇观。<b>没有每天打卡，想来就来</b>——按自己的节奏探险。</div></div>
     <div class="panel"><h3>⭐ 探险成就</h3>
-      <div style="font-size:15px;line-height:1.9">收集到的数学奇观：<b>${gotW}</b> / ${CIVS.length}<br>点亮的探险星：<b>${gotStar}</b><br>累计做对题目：<b>${S.totalRight || 0}</b> 道</div></div>
+      <div style="font-size:15px;line-height:1.9">收集到的数学奇观：<b>${gotW}</b> / ${CIVS.length}<br>点亮的探险星：<b>${gotStar}</b><br>累计做对题目：<b>${S.totalRight || 0}</b> 道<br>当前难度档：<b>${tierInfo().icon} ${esc(tierInfo().name)}</b></div></div>
+    <div class="panel"><h3>⚔️ 擂台战绩</h3>
+      <div style="font-size:15px;line-height:1.9">段位：<b>${pkRank().icon} ${esc(pkRank().name)}</b><br>赢过 <b>${S.pk.win}</b> 场 · 打平 <b>${S.pk.draw}</b> · 惜败 <b>${S.pk.lose}</b>${S.pk.duo ? `<br>同屏对战 <b>${S.pk.duo}</b> 局` : ""}</div>
+      <div class="note">每晋一级段位送 1 张转盘券。段位只升不降。</div></div>
+    <div class="panel"><h3>🧩 思维乐园</h3>
+      <div class="gamewins">${THINK_GAMES.map(g => `<div class="gw ${S.gameWins[g.id] ? "got" : ""}">${g.icon}<span class="cap">${esc(g.name)}${S.gameWins[g.id] ? ` ×${S.gameWins[g.id]}` : ""}</span></div>`).join("")}</div>
+      <div style="font-size:15px;line-height:1.9;margin-top:10px">破解的思维题：<b>${Object.keys(S.challengeDone).length}</b> / ${ALL_CHALLENGES().length}<br>走完三段阶梯：<b>${Object.keys(S.ladderDone).length}</b> 道</div>
+      <div class="note">六个游戏全部通关过一次，送 2 张转盘券${S.gameAllTicket ? "（已领取 ✓）" : ""}。</div></div>
     <div class="panel"><h3>🪙 我的钱包（三科通用）</h3>
       <div style="font-size:15px;line-height:1.9">金币：<b>${S.coins || 0}</b> 🪙<br>转盘券：<b>${S.tickets || 0}</b> 🎡</div>
       <div class="note">数学、语文、英语三个网站是<b>同一个钱包</b>。数学每天首次做对 5 题额外得 20 金币；任意两科达标多 1 张转盘券，三科达标再得限定白白卡。</div></div>`;
@@ -953,7 +976,7 @@ function renderParent(scr) {
   const weak=weakSkills();
   const fmtSec=n=>n<60?`${Math.round(n)}秒`:`${Math.floor(n/60)}分${Math.round(n%60)}秒`;
   const keys=Array.from({length:7},(_,i)=>addDays(todayStr(),i-6));
-  const sumTime=(k,key)=>Number((S.timeLog[k]||{})[key]||0), weekKeys=["map","core","extend","challenge","exam"];
+  const sumTime=(k,key)=>Number((S.timeLog[k]||{})[key]||0), weekKeys=STUDY_VIEWS;
   const todaySecs=weekKeys.reduce((a,k)=>a+sumTime(todayStr(),k),0),weekSecs=keys.reduce((a,d)=>a+weekKeys.reduce((n,k)=>n+sumTime(d,k),0),0);
   const examRows=Object.entries(S.exams).flatMap(([book,rows])=>(rows||[]).map(x=>({book,...x}))).slice(-5).reverse();
   scr.innerHTML = `<div class="panel"><div class="parent-head">${baibaiAvatar()}<div><h3>数学详细报告</h3><p class="note">设置会自动保存。看完可直接回数学，也可去三科统一家长中心。</p></div></div><button class="btn wide" id="parentBackMath">← 返回数学奇境</button><a class="btn ghost wide parent-exit-center" href="https://nevergiveup0618.github.io/learning/?parent=1">🏠 返回统一家长中心</a></div>
