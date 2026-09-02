@@ -151,6 +151,166 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .note{font-size:12.5px;line-height:1.65;color:#8a7d92;margin-top:9px}
 .note b{color:#6f5f77}
 
+
+/* ---------- ⚔️ PK 擂台 ---------- */
+.rankcard{display:flex;gap:14px;align-items:center;padding:15px 16px;margin-bottom:14px;border-radius:22px;
+  background:linear-gradient(135deg,rgba(255,236,246,.92),rgba(238,230,255,.92));
+  border:1px solid rgba(255,255,255,.85);box-shadow:0 10px 26px rgba(175,130,175,.15)}
+.rankcard .rk{font-size:40px;filter:drop-shadow(0 4px 6px rgba(180,130,170,.26))}
+.rankcard .rkn{font-family:var(--serif);font-size:18px;font-weight:700;color:#5f4a67}
+.rankcard .rks{font-size:12.5px;color:#8a7d92;margin-top:4px;line-height:1.55}
+.rankcard .rks b{color:var(--pink-d)}
+.rival{display:flex;gap:13px;align-items:center;padding:13px 14px;margin-bottom:11px;border-radius:20px;
+  background:rgba(255,255,255,.66);border:1px solid var(--line);transition:transform .13s}
+.rival:active{transform:scale(.985)}
+.rival .ico{font-size:34px;width:44px;text-align:center}
+.rival .info{flex:1;min-width:0}
+.rival .nm{font-family:var(--serif);font-size:16.5px;font-weight:700;color:#5f4a67;display:flex;align-items:center;gap:7px}
+.rival .lvl{font-size:11px}
+.rival .ti{font-size:12px;color:var(--pink-d);font-weight:700;margin-top:2px}
+.rival .bl{font-size:12px;color:#8a7d92;margin-top:4px;line-height:1.5}
+.rival .go{font-size:12.5px;color:var(--lav-d);font-weight:800;white-space:nowrap}
+.pkbar{display:flex;align-items:center;gap:10px;padding:11px 14px;margin-bottom:12px;border-radius:20px;
+  background:var(--glass);border:1px solid rgba(255,255,255,.9);box-shadow:0 8px 22px rgba(175,130,175,.14)}
+.pkbar .side{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.pkbar .side.turn{background:rgba(246,165,192,.16);border-radius:14px;padding:4px 0}
+.pkbar .side b{font-size:24px;font-weight:800;color:var(--pink-d);line-height:1.1}
+.pkbar .side small{font-size:11px;color:var(--muted)}
+.pkbar .side .ric{font-size:26px}
+.pkbar .side .math-baibai{width:30px;height:30px}
+.pkbar .vs{font-size:13px;font-weight:800;color:var(--lav-d);letter-spacing:1px}
+.rivalthink{margin-top:14px;padding:10px 14px;border-radius:15px;font-size:13px;color:#8a7d92;
+  background:rgba(184,164,227,.12);border:1px dashed var(--line)}
+.rivalthink.done{color:var(--pink-d);font-weight:700;background:rgba(246,165,192,.16);border-style:solid}
+.pkscore{display:flex;align-items:center;justify-content:center;gap:22px;margin:16px 0 8px}
+.pkscore b{display:block;font-size:34px;color:var(--pink-d);line-height:1.1}
+.pkscore small{font-size:12px;color:var(--muted)}
+.pkscore .vs{font-size:26px;color:var(--lav-d);font-weight:800}
+.duoturn{text-align:center;font-size:14px;color:#8a6f8f;margin-bottom:10px}
+.duoturn b{color:var(--pink-d);font-size:16px}
+.exam-pick.on{background:linear-gradient(135deg,var(--pink),var(--lav));color:#fff;border-color:transparent}
+
+/* ---------- 🧩 思维乐园 ---------- */
+.gamecard{display:flex;gap:12px;align-items:center;padding:12px 13px;margin-bottom:10px;border-radius:19px;
+  background:rgba(255,255,255,.66);border:1px solid var(--line);transition:transform .13s}
+.gamecard:active{transform:scale(.985)}
+.gamecard .gi{font-size:30px;width:40px;text-align:center}
+.gamecard .gt{flex:1;min-width:0}
+.gamecard .gn{font-family:var(--serif);font-size:16px;font-weight:700;color:#5f4a67}
+.gamecard .gdone{font-size:11px;color:var(--good-ink);font-weight:700;margin-left:4px}
+.gamecard .gs{font-size:12px;color:var(--lav-d);margin-top:3px}
+.gamecard .gl{font-size:11.5px;color:var(--muted);margin-top:2px}
+.gamecard .go{font-size:12.5px;color:var(--lav-d);font-weight:800;white-space:nowrap}
+.tfilter{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 4px}
+.tf{padding:7px 13px;border-radius:14px;background:rgba(184,124,190,.1);font-size:12.5px;font-weight:700;color:#8a6f8f}
+.tf.on{background:linear-gradient(135deg,var(--pink),var(--lav));color:#fff}
+.tgroup{margin-top:14px}
+.tgh{font-size:12.5px;font-weight:800;color:#a86f8f;margin-bottom:7px}
+.trow{width:100%;display:flex;gap:11px;align-items:center;text-align:left;padding:11px 12px;margin-bottom:8px;
+  border-radius:16px;background:rgba(255,255,255,.6);border:1px solid var(--line)}
+.trow.done{background:rgba(75,191,143,.09);border-color:rgba(75,191,143,.3)}
+.trow .ti{font-size:22px}
+.trow .tn{flex:1;min-width:0;font-size:14.5px;font-weight:700;color:#5f4a67}
+.trow .tn small{display:block;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:2px}
+.trow .ts{font-size:12px;font-weight:800;color:var(--lav-d);white-space:nowrap}
+.trow.done .ts{color:var(--good-ink)}
+
+/* ---------- 思维游戏公共壳 ---------- */
+.gm-head{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.gm-head .gm-ico{font-size:36px}
+.gm-head .gm-nm{font-family:var(--serif);font-size:19px;font-weight:700;color:#5f4a67}
+.gm-head .gm-th{font-size:12px;color:var(--lav-d);margin-top:3px}
+.gm-how{font-size:13.5px;line-height:1.7;color:#6f6277;background:rgba(255,255,255,.6);
+  border:1px solid var(--line);border-radius:17px;padding:13px 15px;margin-bottom:13px}
+.gm-how .gm-link{font-size:11.5px;color:var(--muted);margin-top:7px}
+.gm-board{background:var(--glass);border:1px solid rgba(255,255,255,.9);border-radius:24px;
+  padding:18px 16px;box-shadow:0 14px 34px rgba(175,130,175,.16)}
+.gm-board .feedback{margin-top:14px}
+/* 24点 */
+.g24-cards{display:flex;gap:10px;justify-content:center;margin-bottom:14px}
+.g24-card{width:60px;height:80px;border-radius:14px;background:#fff;border:2px solid var(--line);
+  font-size:30px;font-weight:800;color:var(--pink-d);box-shadow:0 5px 14px rgba(180,130,170,.16)}
+.g24-card.used{opacity:.3;background:rgba(240,235,245,.9);color:var(--muted)}
+.g24-expr{min-height:52px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;
+  color:#5a4a63;background:#fff;border:2px solid var(--line);border-radius:16px;padding:10px 14px;
+  word-break:break-all;text-align:center;line-height:1.4}
+.g24-expr .ph{font-size:13px;font-weight:500;color:var(--muted)}
+.g24-keys{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
+.g24-key{padding:13px 0;border-radius:14px;background:rgba(184,124,190,.12);font-size:19px;font-weight:800;color:#7a5f86}
+.g24-key.ghost{font-size:14px;background:rgba(246,165,192,.14);color:var(--pink-d)}
+/* 幻方 */
+.mg-wrap{display:grid;grid-template-columns:1fr 34px;grid-template-rows:1fr 26px;gap:6px;max-width:330px;margin:0 auto}
+.mg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.mg-cell{aspect-ratio:1;border-radius:14px;background:#fff;border:2px solid var(--line);
+  font-size:26px;font-weight:800;color:#5a4a63}
+.mg-cell.given{background:rgba(184,164,227,.18);color:var(--lav-d)}
+.mg-cell.sel{border-color:var(--pink);box-shadow:0 0 0 4px rgba(246,165,192,.24)}
+.mg-side{display:grid;grid-template-rows:repeat(3,1fr);gap:7px}
+.mg-side span,.mg-bottom span{display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--muted)}
+.mg-bottom{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.mg-side .good,.mg-bottom .good,.mg-diag .good{color:var(--good-ink)}
+.mg-diag{text-align:center;font-size:13px;color:#8a7d92;margin:12px 0 4px}
+.mg-pad{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px}
+.mg-num{padding:12px 0;border-radius:13px;background:rgba(184,124,190,.12);font-size:18px;font-weight:800;color:#7a5f86}
+.mg-num.used{opacity:.38}
+.mg-num.ghost{font-size:13px;background:rgba(246,165,192,.14);color:var(--pink-d)}
+/* 汉诺塔 */
+.hn-pick,.tfilter{display:flex;gap:8px;flex-wrap:wrap}
+.hn-pick{margin-bottom:12px;justify-content:center}
+.hn-lv{padding:8px 15px;border-radius:14px;background:rgba(184,124,190,.1);font-size:13px;font-weight:700;color:#8a6f8f}
+.hn-lv.on{background:linear-gradient(135deg,var(--pink),var(--lav));color:#fff}
+.hn-meta,.rv-meta,.wg-meta{text-align:center;font-size:13px;color:#8a7d92;margin-bottom:12px}
+.hn-meta b,.rv-meta b,.wg-meta b{color:var(--pink-d)}
+.hn-pegs{display:flex;gap:8px;align-items:flex-end}
+.hn-peg{flex:1;position:relative;min-height:150px;display:flex;flex-direction:column;justify-content:flex-end;
+  align-items:center;gap:4px;padding-bottom:26px;border-radius:14px;background:rgba(255,255,255,.5);border:2px solid transparent}
+.hn-peg.sel{border-color:var(--pink);background:rgba(246,165,192,.14)}
+.hn-rod{position:absolute;bottom:26px;top:14px;width:6px;border-radius:3px;background:rgba(217,160,102,.4)}
+.hn-disk{height:17px;border-radius:9px;box-shadow:0 3px 7px rgba(180,130,170,.24);position:relative;z-index:1}
+.hn-disk.d1{background:linear-gradient(120deg,#f6a5c0,#e87ba6)}
+.hn-disk.d2{background:linear-gradient(120deg,#f7c59f,#e9a06a)}
+.hn-disk.d3{background:linear-gradient(120deg,#a8dcc0,#6cc39b)}
+.hn-disk.d4{background:linear-gradient(120deg,#a9c6f0,#7e9fdc)}
+.hn-disk.d5{background:linear-gradient(120deg,#c9b3ec,#a184d8)}
+.hn-base{position:absolute;bottom:6px;font-size:11px;font-weight:700;color:var(--muted)}
+/* 数独 */
+.sd-grid{display:grid;gap:4px;max-width:300px;margin:0 auto}
+.sd-grid.s4{grid-template-columns:repeat(4,1fr)}
+.sd-grid.s6{grid-template-columns:repeat(6,1fr)}
+.sd-cell{aspect-ratio:1;border-radius:9px;background:#fff;border:2px solid var(--line);font-size:19px;font-weight:800;color:#5a4a63}
+.sd-cell.given{background:rgba(184,164,227,.18);color:var(--lav-d)}
+.sd-cell.sel{border-color:var(--pink);box-shadow:0 0 0 3px rgba(246,165,192,.24)}
+.sd-cell.br{margin-right:3px}
+.sd-cell.bb{margin-bottom:3px}
+/* 过河 */
+.rv-bank{border-radius:18px;padding:12px 14px;background:rgba(255,255,255,.6);border:2px solid rgba(217,160,102,.22)}
+.rv-bank.here{border-color:var(--pink);background:rgba(246,165,192,.12)}
+.rv-bt{font-size:12.5px;font-weight:800;color:#8a6f8f;margin-bottom:9px}
+.rv-boat{color:var(--pink-d)}
+.rv-items{display:flex;gap:10px;flex-wrap:wrap;min-height:52px;align-items:center}
+.rv-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 12px;border-radius:14px;
+  background:#fff;border:2px solid var(--line);font-size:26px}
+.rv-item span{font-size:11px;font-weight:700;color:#7a5f86}
+.rv-item[disabled]{opacity:.4}
+.rv-empty{font-size:12.5px;color:var(--muted)}
+.rv-river{text-align:center;font-size:19px;color:#8fc4dd;letter-spacing:2px;margin:8px 0}
+/* 找次品 */
+.wg-pans{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.wg-pan{flex:1;text-align:center;padding:11px 8px;border-radius:15px;background:rgba(255,255,255,.66);
+  border:1px solid var(--line);font-size:12px;color:var(--muted)}
+.wg-pan b{display:block;font-size:16px;color:var(--pink-d);margin-top:3px;letter-spacing:2px}
+.wg-mid{font-size:26px}
+.wg-balls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+.wg-ball{width:42px;height:42px;border-radius:50%;background:#fff;border:2px solid var(--line);
+  font-size:15px;font-weight:800;color:#7a5f86}
+.wg-ball.p1{background:linear-gradient(135deg,#f6a5c0,#e87ba6);color:#fff;border-color:transparent}
+.wg-ball.p2{background:linear-gradient(135deg,#b8a4e3,#9a82d4);color:#fff;border-color:transparent}
+.wg-ball.guess{box-shadow:0 0 0 3px rgba(246,165,192,.3)}
+.wg-log{font-size:12.5px;line-height:1.9;color:#7a6f82}
+.wg-log b{color:var(--pink-d)}
+.wg-tip{text-align:center;font-size:13.5px;font-weight:700;color:var(--pink-d);padding:12px 0}
+.gamestage{padding-bottom:26px}
+
 /* ---------- 底部导航 ---------- */
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:760px;
   display:flex;background:linear-gradient(180deg,rgba(255,251,248,.9),rgba(255,246,250,.98));
@@ -220,13 +380,15 @@ body{background:radial-gradient(circle at 10% 0,#e7f5ff 0,transparent 30%),radia
   <div id="screen"></div>
   <nav class="nav" id="nav">
     <button data-v="map" class="on"><span class="i">🗺️</span>探险</button>
-    <button data-v="review"><span class="i">🧩</span>复习</button>
-    <button data-v="exam"><span class="i">📝</span>测验</button>
+    <button data-v="pk"><span class="i">⚔️</span>PK</button>
+    <button data-v="think"><span class="i">🧩</span>思维</button>
+    <button data-v="review"><span class="i">🔁</span>复习</button>
     <button data-v="rewards"><span class="i">🏺</span>收藏</button>
   </nav>
 </div>
 <div class="toast" id="toast"></div>
 <script src="data.js"></script>
+<script src="games.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
