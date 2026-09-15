@@ -676,7 +676,10 @@ function startPk(rivalId) {
 function startDuo() {
   const book = S.pkBook || "适合我", pool = pkPool(book);
   if (!pool.length) return toast("这一册还没有题，换一个范围");
-  pkSess = { mode: "duo", book, pool, plan: buildPlan(pool, 12), i: 0, n: 12, a: 0, b: 0, names: ["玩家 1", "玩家 2"] };
+  /* mine 先留空 —— 进去第一屏要先问「哪个是你」。
+     不问的话，两个人轮流答的题分不清谁做的，孩子答对的题就只能全部丢掉不计
+     （2026-09-15 之前就是这样：和家人玩 12 道题，家长后台里「今天做对题数」还是 0）。 */
+  pkSess = { mode: "duo", book, pool, plan: buildPlan(pool, 12), i: 0, n: 12, a: 0, b: 0, mine: null, names: ["🐰 玩家 1", "🐻 玩家 2"] };
   go("pkRun");
 }
 
@@ -781,8 +784,25 @@ function pkDone(scr) {
   $("#other").onclick = () => { nav = []; S.view = "pk"; render(); };
 }
 
+function duoSetup(scr) {
+  $("#title").textContent = "同屏对战";
+  scr.className = "stage";
+  scr.innerHTML = `<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">两个人一起玩！</div>轮流答题，各 6 道，比谁答对得多。<b>先告诉白白哪个是你</b> —— 这样你答对的题才会记进你自己的学习记录。<div class="soft">对方答的题不会算到你头上。</div></div></div>
+    <div class="panel"><h3>👋 哪个是你？</h3>
+      <div class="duopick">
+        <button class="duobtn" data-mine="0"><span>🐰</span>我是玩家 1<small>先手</small></button>
+        <button class="duobtn" data-mine="1"><span>🐻</span>我是玩家 2<small>后手</small></button>
+      </div></div>`;
+  scr.querySelectorAll("[data-mine]").forEach(b => b.onclick = () => {
+    pkSess.mine = Number(b.dataset.mine);
+    pkSess.names = pkSess.mine === 0 ? ["🐰 我", "🐻 对手"] : ["🐰 对手", "🐻 我"];
+    duoRound(scr);
+  });
+}
+
 function duoRound(scr) {
   const s = pkSess;
+  if (s.mine === null || s.mine === undefined) return duoSetup(scr);
   if (s.i >= s.n) {
     S.pk.duo = (S.pk.duo || 0) + 1; save(); addCoins(6);
     const who = s.a === s.b ? "平手" : (s.a > s.b ? s.names[0] : s.names[1]) + " 赢";
@@ -790,7 +810,8 @@ function duoRound(scr) {
     scr.innerHTML = `<div class="qcard" style="text-align:center"><div style="font-size:52px">${s.a === s.b ? "🤝" : "🎉"}</div>
       <div class="qtext">${esc(who)}</div>
       <div class="pkscore"><div><b>${s.a}</b><small>${esc(s.names[0])}</small></div><div class="vs">:</div><div><b>${s.b}</b><small>${esc(s.names[1])}</small></div></div>
-      <p style="font-size:14px;opacity:.85">两个人一起做完 12 道题，<b>+6 🪙</b> 进共享钱包。</p>
+      <p style="font-size:14px;opacity:.85">两个人一起做完 12 道题，<b>+6 🪙</b> 进共享钱包。<br>
+        <span style="opacity:.8">你自己答对的 <b>${s.mine === 0 ? s.a : s.b}</b> 道已经记进学习记录（对手的不算）。</span></p>
       <button class="btn wide" id="again">再来一局</button><button class="btn ghost wide" id="other">返回擂台</button></div>`;
     pkSess = null;
     $("#again").onclick = () => startDuo();
@@ -815,10 +836,14 @@ function duoRound(scr) {
   let done = false;
   const submit = () => {
     if (done) return; const v = $("#ans").value.trim(); if (v === "") return;
-    done = true; const ok = Number(v) === prob.a;
+    done = true; const ok = Number(v) === prob.a, isMine = turn === s.mine;
     if (ok) { if (turn === 0) s.a++; else s.b++; }
+    /* 只有孩子自己答的那一半进学习记录，对方答的不算 —— 否则会把家长/同学的成绩
+       混进她的正确率、SRS 和「今天做对几题」里。 */
+    if (isMine) { markAttempt(skill.id, ok); srsGrade(skill.id, ok); if (ok) { markCorrect(); addCoins(1); } }
     const fb = $("#fb"); fb.className = `feedback ${ok ? "ok" : "no"} show`;
-    fb.innerHTML = ok ? `${esc(s.names[turn])} 答对，得 1 分！` : `答案是 <b>${prob.a}</b>。${prob.hint ? "<br>" + prob.hint : ""}`;
+    fb.innerHTML = (ok ? `${esc(s.names[turn])} 答对，得 1 分！${isMine ? " <b>+1 🪙</b>" : ""}` : `答案是 <b>${prob.a}</b>。${prob.hint ? "<br>" + prob.hint : ""}`)
+      + (isMine ? '<div class="rivalsay small">这道算进你自己的学习记录了 📒</div>' : "");
     $("#ans").disabled = true; $("#ok").classList.add("hidden"); $("#nextb").classList.remove("hidden");
   };
   $("#ok").onclick = submit; $("#ans").onkeydown = e => { if (e.key === "Enter") submit(); };
@@ -892,13 +917,22 @@ function renderThinkGame(scr) {
 }
 
 /* ---------- 🧩 智能复习：首页级入口，只推荐真正需要回看的内容 ---------- */
-function findSkillStation(skill){return CIVS.find(c=>(STATIONS[c.id]?.core||[]).some(x=>x.id===skill.id));}
+/* ⚠️ 热身口算不属于任何文明站，findSkillStation 对它返回 undefined。
+   2026-09-15 之前这里没兜底，智能复习页模板里的 ${c.id} 直接抛异常 ——
+   孩子做过一轮热身口算、隔天到期，一点「复习」整页就白屏。
+   给它一个伪站，点进去正好回到热身练习。 */
+const WARMUP_CIV = { id:"warmup", icon:"🌱", name:"热身口算" };
+function findSkillStation(skill){
+  if(!skill) return null;
+  if(WARMUP_SKILLS.some(x=>x.id===skill.id)) return WARMUP_CIV;
+  return CIVS.find(c=>(STATIONS[c.id]?.core||[]).some(x=>x.id===skill.id));
+}
 function skillById(id){return ALL_SKILLS().find(s=>s.id===id);}
 function renderReview(scr){
   $("#title").textContent="智能复习";scr.className="stage";nav=[];
   const due=srsDueAll(),weak=weakSkills(),list=[...new Map(due.concat(weak).map(x=>[x.id,x])).values()].slice(0,12);
   scr.innerHTML=`<div class="guide baibai">${baibaiAvatar()}<div class="bubble"><div class="hello">只复习真正需要的</div>已经熟练的题会少出现；做错的知识点会换一种数字再回来。没有倒计时，也不扣金币。</div></div>
-    ${list.length?`<div class="panel"><h3>今天适合再看一眼</h3>${list.map(s=>{const c=findSkillStation(s),a=S.attempts[s.id]||{};return `<button class="review-row" data-skill="${s.id}" data-civ="${c.id}"><span>${s.icon}</span><b>${esc(s.name)}</b><small>${a.total?`已练${a.total}次 · 正确${a.right}次`:"到复习时间了"}</small><i>开始 ›</i></button>`}).join("")}</div>`:`<div class="qcard" style="text-align:center">${baibaiTip("目前没有到期错题。可以去地图随便探索，或者做一次阶段测验。")}</div>`}`;
+    ${list.length?`<div class="panel"><h3>今天适合再看一眼</h3>${list.map(s=>{const c=findSkillStation(s),a=S.attempts[s.id]||{};return `<button class="review-row" data-skill="${s.id}" data-civ="${(c&&c.id)||"warmup"}"><span>${s.icon}</span><b>${esc(s.name)}</b><small>${a.total?`已练${a.total}次 · 正确${a.right}次`:"到复习时间了"}</small><i>开始 ›</i></button>`}).join("")}</div>`:`<div class="qcard" style="text-align:center">${baibaiTip("目前没有到期错题。可以去地图随便探索，或者做一次阶段测验。")}</div>`}`;
   scr.querySelectorAll(".review-row").forEach(b=>b.onclick=()=>{S.civ=b.dataset.civ;sess=null;go("core",{civ:b.dataset.civ})});
 }
 

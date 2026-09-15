@@ -237,14 +237,24 @@ ok("对战结束发金币", window.eval("S.coins") > pkCoin0);
 ok("段位随胜场提升", window.eval("pkRank().name") !== undefined);
 window.eval("nav=[]; S.view='pk'; render();");
 click($("#duoBtn"));
-ok("同屏对战显示轮到谁", $("#screen").textContent.includes("轮到"));
-let duoGuard = 0;
+ok("★ 同屏对战先问「哪个是你」", window.document.querySelectorAll(".duobtn").length === 2 && $("#screen").textContent.includes("哪个是你"));
+ok("说清楚了为什么要问（要记进自己的学习记录）", $("#screen").textContent.includes("学习记录"));
+window.eval("S.totalRight=0; S.daily={date:todayStr(),correct:0}; S.attempts={}; S.srs={};");
+click(window.document.querySelector("[data-mine='0']"));   // 孩子当玩家1（先手，答第 1/3/5… 题）
+ok("选完人才开始答题", $("#screen").textContent.includes("轮到") && !!$("#ans"));
+let duoGuard = 0, duoMineRight = 0;
 while ($("#ans") && duoGuard++ < 30) {
-  $("#ans").value = String(window.eval("pkSess.cur.prob.a"));
+  const isMine = window.eval("pkSess.i % 2 === pkSess.mine");
+  $("#ans").value = String(window.eval("pkSess.cur.prob.a"));   // 两边都答对
+  if (isMine) duoMineRight++;
   click($("#ok"));
   if ($("#nextb") && !$("#nextb").classList.contains("hidden")) click($("#nextb"));
 }
 ok("同屏对战 12 题跑完并计入战绩", window.eval("S.pk.duo") === 1);
+ok("★ 只有自己答对的那一半进「累计做对题数」（对手的不算）",
+  window.eval("S.totalRight") === duoMineRight && duoMineRight === 6);
+ok("★ 自己答的题才进 SRS 和正确率统计", window.eval("Object.keys(S.attempts).length") > 0 && window.eval("Object.keys(S.srs).length") > 0);
+ok("结算页说明了哪些算进记录", $("#screen").textContent.includes("已经记进学习记录"));
 
 console.log("— 🧩 思维乐园 —");
 window.eval("nav=[]; S.view='think'; render();");
@@ -413,6 +423,20 @@ ok("★ 宝库展示擂台战绩", $("#screen").textContent.includes("擂台战�
 ok("★ 宝库展示六个思维游戏的通关情况", window.document.querySelectorAll(".gamewins .gw").length === 6 && window.document.querySelectorAll(".gamewins .gw.got").length === 6);
 ok("★ 宝库展示思维题破解数与三段阶梯", $("#screen").textContent.includes("破解的思维题") && $("#screen").textContent.includes("走完三段阶梯"));
 ok("宝库显示当前难度档", $("#screen").textContent.includes("当前难度档"));
+
+
+console.log("— 🌱 热身口算进复习页不能把页面带崩 —");
+/* 2026-09-15 真 bug：热身技能不属于任何文明站，findSkillStation 返回 undefined，
+   智能复习页模板里的 ${c.id} 直接抛异常 —— 做过一轮热身、隔天点「复习」整页白屏。 */
+window.eval("S.srs={wu_mul:{lv:1,due:'2020-01-01'}}; S.attempts={wu_mul:{right:1,total:2,streak:0,lastWrong:'2020-01-01'}};");
+ok("热身技能会进到期复习清单", window.eval("srsDueAll().some(s=>s.id==='wu_mul')"));
+ok("★ findSkillStation 认识热身技能（不再返回 undefined）", window.eval("!!findSkillStation({id:'wu_mul'})"));
+let reviewOk = true;
+try { window.eval("nav=[]; S.view='review'; render();"); } catch (e) { reviewOk = false; }
+ok("★ 带热身题的复习页能正常渲染（曾经整页白屏）", reviewOk && window.document.querySelectorAll(".review-row").length >= 1);
+ok("热身复习行点进去回到热身练习", window.document.querySelector(".review-row").dataset.civ === "warmup");
+click(window.document.querySelector(".review-row"));
+ok("★ 点热身复习行能真的开练", window.eval("S.civ") === "warmup" && !!$("#ans"));
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);
